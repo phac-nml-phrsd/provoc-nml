@@ -1,0 +1,4 @@
+data/clean/*
+!data/clean/_placeholder*
+data/raw/*
+!data/raw/_placeholder
