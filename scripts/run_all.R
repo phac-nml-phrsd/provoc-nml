@@ -27,7 +27,7 @@ fused <- fuse(coco, varmat)
 
 #### OPTIM ------------------------------------------------
 res1 <- provoc(fused, method = "optim")
-any(sapply(res1, function(x) x$convergence)) # FALSE is good
+convergence(res1)
 
 
 
@@ -35,25 +35,16 @@ any(sapply(res1, function(x) x$convergence)) # FALSE is good
 
 #### RUNJAGS ----------------------------------------------
 res2 <- provoc(fused, method = "runjags")
-any(sapply(res2, function(x) x$convergence))
+convergence(res2)
 
 
 
 
 
 #### ALL TOGETHER NOW -------------------------------------
-for(i in seq_along(res1)) {
-    dfa <- bind_cols(res1[[i]]$point_est, res1[[i]]$sample_info)
-    dfa$method <- "optim"
-    dfb <- bind_cols(res2[[i]]$point_est, res2[[i]]$sample_info)
-    dfb$method <- "runjags"
-
-    if(i == 1) {
-        df <- bind_rows(dfa, dfb)
-    } else {
-        df <- bind_rows(df, dfa, dfb)
-    }
-}
+res1$method <- "optim"
+res2$method <- "runjags"
+df <- bind_rows(res1, res2)
 
 ggplot(df) + 
     aes(x = date, y = rho, shape = method, colour = location) +
