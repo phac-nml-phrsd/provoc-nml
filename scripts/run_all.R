@@ -29,19 +29,6 @@ fused <- fuse(coco, varmat)
 res1 <- provoc(fused, method = "optim")
 any(sapply(res1, function(x) x$convergence)) # FALSE is good
 
-res1a <- lapply(seq_along(res1), function(x) {
-    est <- res1[[x]]$point_est
-    est$convergence <- res1[[x]]$convergence
-    est$sample <- names(res1)[x]
-    est
-}) %>% bind_rows() 
-
-sample_info <- animal %>%
-    group_by(sample, date, region) %>%
-    tally()
-
-res1a <- left_join(res1a, sample_info, by = "sample")
-
 
 
 
@@ -49,15 +36,6 @@ res1a <- left_join(res1a, sample_info, by = "sample")
 #### RUNJAGS ----------------------------------------------
 res2 <- provoc(fused, method = "runjags")
 any(sapply(res2, function(x) x$convergence))
-
-res2a <- lapply(seq_along(res2), function(x) {
-    est <- res2[[x]]$point_est
-    est$convergence <- res2[[x]]$convergence
-    est$sample <- names(res2)[x]
-    est
-}) %>% bind_rows() 
-
-res2a <- left_join(res2a, sample_info, by = "sample")
 
 
 
