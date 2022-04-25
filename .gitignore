@@ -2,3 +2,9 @@ data/clean/*
 !data/clean/_placeholder*
 data/raw/*
 !data/raw/_placeholder
+
+output/*.RDS
+results/*.RDS
+results/*.pdf
+
+/data/canada_variants.csv
