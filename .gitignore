@@ -8,3 +8,4 @@ results/*.RDS
 results/*.pdf
 
 /data/canada_variants.csv
+/data/lineage_list.csv
