@@ -9,7 +9,7 @@ suppressPackageStartupMessages({
 nml1 <- read.csv(here("data", "raw", "VCFDATA_MontrealAug15-Oct23.csv"))
 nml2 <- read.csv(here("data", "raw", "VCFDATA_VLIAug15-Oct23.csv"))
 
-nml <- bind_rows(nml1, nml1) %>% 
+nml <- bind_rows(nml1, nml2) %>% 
     distinct()
 
 animal <- nml %>% 
