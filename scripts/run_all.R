@@ -5,7 +5,11 @@ suppressPackageStartupMessages({
     library(provoc)
     library(lubridate)
     library(here)
+    library(rjags)
+    library(runjags)
 })
+
+force_refit <- FALSE
 
 animal <- read.csv(here("data/clean", "nml.csv")) 
 coco <- animal %>%
@@ -13,26 +17,26 @@ coco <- animal %>%
         yes = "MMN", 
         no = ifelse(grepl("MMS", sample),
             yes = "MMS",
-            no = "Other")),
+            no = "VLI")),
         mutation = label,
         coverage = alt_dp + ref_dp, # TODO: Is this correct for coverage?
         count = round(frequency * coverage, 0))
 
 varmat_types <- c("constellations", "varmat_from_variants-all_voc", "varmat_from_variants-omicron_delta", "varmat_from_data")
-varmat_type <- varmat_types[1]
+varmat_type <- varmat_types[4]
 
 for(varmat_type in varmat_types[1:3]) { # varmat_from_data causes errors - probably too big or with too many minor mutations
 
     handle <- paste0("results/", varmat_type, ".RDS")
-    if(file.exists(handle)) {
+    if(file.exists(handle) & !force_refit) {
         res <- readRDS(handle)
         res1 <- res$optim
         res2 <- res$runjags
     } else {
         if(varmat_type == "constellations") {
-            varmat <- astronomize()
+            varmat <- astronomize(path = here("..", "/constellations"))
         } else if (varmat_type == "varmat_from_variants-all_voc") {
-            all_voc <-  c(#"B.1.1.529", "BA.1", "BA.1.1", "BA.2", 
+            all_voc <-  c("B.1.1.529", "BA.1", "BA.1.1", "BA.2", 
                 "B.1.1.7", "P.1", "P.2", "P.3", 
                 "B.1.617.2", "AY.1", "AY.2", "AY.4", "AY.4.2", 
                 "C.37", "B.1.621", "B.1.351", "B.1.525", "B.1.526", "B.1.617.1")
