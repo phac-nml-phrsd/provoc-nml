@@ -21,7 +21,7 @@ coco <- animal %>%
             yes = "MMS",
             no = "VLI")),
         mutation = label,
-        coverage = alt_dp + ref_dp, # TODO: Is this correct for coverage?
+        coverage = alt_dp + ref_dp, # TODO: Is this correct?
         count = round(frequency * coverage, 0))
 
 coco <- filter(coco, location == "VLI")
@@ -56,35 +56,36 @@ ggplot(sens10) +
 
 # TODO: scatterplots of lineages to show correspondence
 
-t0 <- Sys.time()
-allsense <- list()
-nuisances <- c(5, 10, 15, 20)
-for(nuisance in nuisances) {
-    print(nuisance)
-    n_cores <- detectCores() - 1
-    cl <- makeCluster(n_cores)
-    clusterExport(cl, c("varmat", "coco", "voi", "provoc", "fuse", "summarise", "group_by", "mutate", "nuisances", "n"))
-    allsense[[nuisance]] <- bind_rows(parLapply(cl, 1:100, function(i) {
-        oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
-        newvars <- sample(oldvars, nuisances, FALSE)
-        varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
+par_fun <- function(i) {
+    iteration <- inu[i, 'iteration']
+    nuisances <- inu[i, 'nuisance']
+    oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
+    newvars <- sample(oldvars, nuisances, FALSE)
+    varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
 
-        fused2 <- fuse(coco, varmat2, verbose = FALSE)
+    fused2 <- fuse(coco, varmat2, verbose = FALSE)
 
-        summarise(group_by(mutate(provoc(fused = fused2, method = "optim"), 
-                variant = ifelse(variant %in% voi, variant, "Other"),
-                iteration = rep(i, n())
-            ),
-            variant, sample, date, iteration),
-            rho = sum(rho))
-    }))
-    allsense[[nuisance]]$nuisance_lineages <- nuisance
+    summarise(group_by(mutate(provoc(fused = fused2, method = "optim"), 
+            variant = ifelse(variant %in% voi, variant, "Other"),
+            iteration = rep(iteration, n()),
+            nuisance_lineages = rep(nuisances, n())
+        ),
+        variant, sample, date, iteration, nuisance_lineages),
+        rho = sum(rho))
 }
-Sys.time() - t0
 
-allsense <- bind_rows(allsense)
+inu <- expand.grid(iteration = 1:100, nuisance = c(5, 10, 15, 20))
+
+n_cores <- detectCores() - 1
+cl <- makeCluster(n_cores)
+clusterExport(cl, c("varmat", "coco", "voi", "provoc", "fuse", 
+    "summarise", "group_by", "mutate", "nuisances", "n", "inu"))
+allsense <- bind_rows(parLapply(cl, 1:nrow(inu), par_fun))
+stopCluster(cl)
 
 ggplot(allsense) + 
     aes(x = variant, y = rho, fill = factor(nuisance_lineages)) +
     geom_violin(draw_quantiles = c(0.5)) + 
-    facet_wrap(~ variant + date, scales = "free_x")
+    facet_wrap(~ variant + date, scales = "free_x") +
+    labs(fill = "Nuisances")
+# The increase in other as we add lineages indicates more than just Delta!
