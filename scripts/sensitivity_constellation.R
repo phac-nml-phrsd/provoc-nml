@@ -54,75 +54,39 @@ ggplot(sens10) +
 
 # TODO: scatterplots of lineages to show correspondence
 
-sens5 <- bind_rows(lapply(1:100, function(i) {
-    oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
-    newvars <- sample(oldvars, 5, FALSE)
-    varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
-    fused2 <- fuse(coco, varmat2)
-    res <- provoc(fused = fused2, method = "optim")
-    res %>% 
-        mutate(
-            variant = ifelse(variant %in% voi, variant, "Other10"),
-            iteration = i,
-            nuisance_lineages = 5
-        ) %>%
-        group_by(variant, sample, date) %>%
-        summarise(rho = sum(rho))
-}))
+t0 <- Sys.time()
+for(nuisances in c(5, 10, 15, 20, 25)) {
+    for(i in 1:100) {
+        print(nuisances)
+        print(i)
+        t1 <- Sys.time()
+        oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
+        newvars <- sample(oldvars, nuisances, FALSE)
+        varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
 
-sens15 <- bind_rows(lapply(1:100, function(i) {
-    oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
-    newvars <- sample(oldvars, 15, FALSE)
-    varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
-    fused2 <- fuse(coco, varmat2)
-    res <- provoc(fused = fused2, method = "optim")
-    res %>% 
-        mutate(
-            variant = ifelse(variant %in% voi, variant, "Other10"),
-            iteration = i,
-            nuisance_lineages = 15
-        ) %>%
-        group_by(variant, sample, date) %>%
-        summarise(rho = sum(rho))
-}))
+        fused2 <- fuse(coco, varmat2, verbose = FALSE)
 
-sens20 <- bind_rows(lapply(1:100, function(i) {
-    oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
-    newvars <- sample(oldvars, 20, FALSE)
-    varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
-    fused2 <- fuse(coco, varmat2)
-    res <- provoc(fused = fused2, method = "optim")
-    res %>% 
-        mutate(
-            variant = ifelse(variant %in% voi, variant, "Other10"),
-            iteration = i,
-            nuisance_lineages = 20
-        ) %>%
-        group_by(variant, sample, date) %>%
-        summarise(rho = sum(rho))
-}))
+        res <- provoc(fused = fused2, method = "optim") %>% 
+            mutate(
+                variant = ifelse(variant %in% voi, variant, "Other"),
+                iteration = rep(i, n()),
+                nuisance_lineages = rep(nuisances, n())
+            ) %>%
+            group_by(variant, sample, date, iteration, nuisance_lineages) %>%
+            summarise(rho = sum(rho))
 
-sens25 <- bind_rows(lapply(1:100, function(i) {
-    oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
-    newvars <- sample(oldvars, 25, FALSE)
-    varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
-    fused2 <- fuse(coco, varmat2)
-    res <- provoc(fused = fused2, method = "optim")
-    res %>% 
-        mutate(
-            variant = ifelse(variant %in% voi, variant, "Other10"),
-            iteration = i,
-            nuisance_lineages = 25
-        ) %>%
-        group_by(variant, sample, date) %>%
-        summarise(rho = sum(rho))
-}))
-
-allsense <- bind_rows(sens5, sens10, sens15, sens20, sens25)
-
+        if(!exists("allsense")) {
+            allsense <- res
+        } else {
+            allsense <- bind_rows(allsense, res)
+        }
+        print(Sys.time() - t1)
+        print()
+    }
+}
+Sys.time() - t0
 
 ggplot(allsense) + 
-    aes(x = date, y = rho) +
+    aes(x = variant, y = rho, fill = factor(nuisance_lineages)) +
     geom_violin() + 
-    facet_wrap(nuisance_lineages ~ variant) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+    facet_wrap(~ date + variant, scales = "free_x")
