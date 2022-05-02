@@ -11,6 +11,8 @@ suppressPackageStartupMessages({
     library(runjags)
 })
 
+library(parallel)
+
 animal <- read.csv(here("data/clean", "nml.csv")) 
 coco <- animal %>%
     mutate(location = ifelse(grepl("MMN", sample), 
@@ -27,7 +29,7 @@ coco <- filter(coco, location == "VLI")
 varmat <- astronomize(path = here("..", "/constellations"))
 
 
-voi <- c("B.1.617.2", "B.1.617.2+K417N", "AY.4", "AY.4.2")
+voi <- c("B.1.617.2", "B.1.617.2+K417N", "AY.4")
 
 sens10 <- bind_rows(lapply(1:100, function(i) {
     oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
@@ -55,38 +57,34 @@ ggplot(sens10) +
 # TODO: scatterplots of lineages to show correspondence
 
 t0 <- Sys.time()
-for(nuisances in c(5, 10, 15, 20, 25)) {
-    for(i in 1:100) {
-        print(nuisances)
-        print(i)
-        t1 <- Sys.time()
+allsense <- list()
+nuisances <- c(5, 10, 15, 20)
+for(nuisance in nuisances) {
+    print(nuisance)
+    n_cores <- detectCores() - 1
+    cl <- makeCluster(n_cores)
+    clusterExport(cl, c("varmat", "coco", "voi", "provoc", "fuse", "summarise", "group_by", "mutate", "nuisances", "n"))
+    allsense[[nuisance]] <- bind_rows(parLapply(cl, 1:100, function(i) {
         oldvars <- rownames(varmat)[!rownames(varmat) %in% voi]
         newvars <- sample(oldvars, nuisances, FALSE)
         varmat2 <- varmat[rownames(varmat) %in% c(voi, newvars), ]
 
         fused2 <- fuse(coco, varmat2, verbose = FALSE)
 
-        res <- provoc(fused = fused2, method = "optim") %>% 
-            mutate(
+        summarise(group_by(mutate(provoc(fused = fused2, method = "optim"), 
                 variant = ifelse(variant %in% voi, variant, "Other"),
-                iteration = rep(i, n()),
-                nuisance_lineages = rep(nuisances, n())
-            ) %>%
-            group_by(variant, sample, date, iteration, nuisance_lineages) %>%
-            summarise(rho = sum(rho))
-
-        if(!exists("allsense")) {
-            allsense <- res
-        } else {
-            allsense <- bind_rows(allsense, res)
-        }
-        print(Sys.time() - t1)
-        print()
-    }
+                iteration = rep(i, n())
+            ),
+            variant, sample, date, iteration),
+            rho = sum(rho))
+    }))
+    allsense[[nuisance]]$nuisance_lineages <- nuisance
 }
 Sys.time() - t0
 
+allsense <- bind_rows(allsense)
+
 ggplot(allsense) + 
     aes(x = variant, y = rho, fill = factor(nuisance_lineages)) +
-    geom_violin() + 
-    facet_wrap(~ date + variant, scales = "free_x")
+    geom_violin(draw_quantiles = c(0.5)) + 
+    facet_wrap(~ variant + date, scales = "free_x")
