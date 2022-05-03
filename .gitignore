@@ -2,6 +2,8 @@ data/clean/*
 !data/clean/_placeholder*
 data/raw/*
 !data/raw/_placeholder
+data/coverage/*
+!data/coverage/placeholder
 
 output/*.RDS
 results/*.RDS
