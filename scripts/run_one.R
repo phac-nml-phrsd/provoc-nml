@@ -9,6 +9,10 @@ suppressPackageStartupMessages({
     library(runjags)
 })
 
+varmat_type <- c("constellations", "varmat_from_variants-all_voc", 
+    "varmat_from_variants-omicron_delta", "varmat_from_data")[3]
+method <- c("optim", "runjags")[1]
+
 animal <- read.csv(here("data/clean", "nml.csv")) 
 coco <- animal %>%
     mutate(location = ifelse(grepl("MMN", sample), 
@@ -20,12 +24,6 @@ coco <- animal %>%
         coverage = alt_dp + ref_dp, # TODO: Is this correct for coverage?
         count = round(frequency * coverage, 0))
 
-varmat_types <- c("constellations", "varmat_from_variants-all_voc", "varmat_from_variants-omicron_delta", "varmat_from_data")
-# Choose a variant matrix
-varmat_type <- varmat_types[4]
-
-# Choose a method
-method <- c("optim", "runjags")[1]
 
 # (Optional) Choose one sample to run.
 coco <- filter(coco, sample == unique(coco$sample)[1])
@@ -46,18 +44,29 @@ if(varmat_type == "constellations") {
         "B.1.617.2", "AY.1", "AY.2", "AY.4", "AY.4.2"), 
         mutation_format = "aa")
 } else {
-    varmat <- varmat_from_data(type = coco$type, pos = coco$pos, alt = coco$alt, max_n = 30, mutation_format = "aa")
+    varmat <- varmat_from_data(type = coco$type, pos = coco$pos, alt = coco$alt, max_n = 80, mutation_format = "aa")
 }
 
 fused <- fuse(coco, varmat)
 res <- provoc(fused = fused, method = method)
 
 res %>% 
-    # Uncomment to only show high probability variants
-    #group_by(variant) %>% mutate(include = rep(!all(rho < 0.05), n())) %>% ungroup() %>%  filter(include) %>%
-    ggplot(aes(x = ymd(date), y = rho, colour = location)) + 
+    ggplot(aes(x = variant, y = rho)) + 
         geom_point() + 
-        facet_wrap(~ variant) +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
-        scale_x_date(breaks = sort(unique(ymd(res$date)))) +
-        labs(title = "Results from Optim")
+        labs(title = "Results from Optim") +
+        coord_flip()
+
+var2 <- varmat[res$variant,]
+
+pred_muts <- res$rho %*% var2
+
+pred_compare <- inner_join(
+    x = coco[, c("mutation", "count", "coverage", "frequency")],
+    y = data.frame(mutation = colnames(pred_muts), 
+        rho = as.numeric(pred_muts)),
+    by = "mutation")
+
+ggplot(pred_compare) +
+    aes(x = frequency, y = rho) + 
+    geom_point()
