@@ -11,3 +11,7 @@ results/*.pdf
 
 /data/canada_variants.csv
 /data/lineage_list.csv
+
+report/*
+!report/*tex
+!report/*bib
