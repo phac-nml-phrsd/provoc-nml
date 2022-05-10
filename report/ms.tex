@@ -1,0 +1,131 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{geometry}
+\usepackage{natbib}
+
+\title{Proportions of Variants of Concern in NML Wastewater Data}
+\author{Devan Becker, others}
+\date{}
+
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Wastewater is good for many things.
+Others have done some variant detection via various methods.
+Our method is principled, statistically sound, and cool.
+Mutation lists are an NP-hard problem (not actually, but basically).
+The method performs great, package is set up in a convenient way (TODO: set up package in a convenient way).
+\end{abstract}
+
+\section{Introduction}
+
+Did you know there was a pandemic?
+Wastewater has been shown to be useful for many analyses and pandemic response policies.
+
+There are a few approaches to detection of SARS-CoV-2 variants\footnote{We use the convention that ``variant'' refers to a particular subtype of SARS-CoV-2 that is of interest to health authorities, such as the WHO's designated Variants of Concern (VoC) or Variants of Interest (VoI), and ``lineage'' refers to any subtype of SARS-CoV-2, whether it's designated a VOC, VOI, or neither.} in wastewater.
+PCR-based search for particular variants when there are very specific mutations that are uniquely defining and easy to target.
+For instance, the S-Gene Target Failure (SGTF) uniquely defines the BA.1 subvariant of B.1.1.529 (Omicron), but is not present in BA.2.
+Detection of SGTF can be done without performing a full sequencing of a wastewater sample, and was useful in the detection of Omicron.
+
+The remaining methods rely on full sequencing of the wastewater sample.
+Research is still being performed on optimal sequencing strategies.
+For a thorough discussion, do your own literature review. TODO: References for wastewater sequencing.
+Under the ARTIC protocol (one of the most commonly used sequencing strategies), sequencing is performed using 48 amplicon regions of approximately 400bp each.
+This results in a short read file of many reads that may or may not come from the same genome\footnote{It is essentially impossible to obtain and sequence any complete genomes from wastewater}.
+Most common processing pipelines result in a list of mutations (relative to some reference genome, often Wuhan-1), along with the number of times those mutations were observed.
+The read depth at each position relative to a reference is also obtained.
+For the rest of this paper, we are primarily concerned with these data, which we will refer to as counts and coverage, respectively.
+
+Instead of a targeted sequencing analysis (such as searching for SGTF), one can search the list of mutations for lineage-defining mutations.
+Given a list of mutations that are believed to be unique (or sufficiently representative) to one lineage, the average of the observed frequencies\footnote{Frequency here is defined as the count divided by the coverage at that location.} of the mutations can be reported as an estimate of the abundance of that lineage \citep{chrystal's preprint}.
+The counts and coverage can be seen as ``successes'' and ``sample size'' in a binomial model, which allows for something like a weighted average of frequencies along with a confidence interval.
+This model can be found in GromStole, where the authors incorporate overdispersion for a more robust estimate of the confidence interval limits.
+
+We are aware of two methods for ``deconvolution'' or ``de-mixing'' of mutations and variants.
+Both methods are based on the idea that the frequency of a mutation should be approximately equal to the sum of the proportions of lineages present in the wastewater that contain that mutation.
+For instance, if mutation A has a frequency of 0.75 and both Lineage 1 and Lineage 2 are known to have mutation A, then the porportion of Lineage 1 plus the proportion of Lineage 2 should (ideally) sum to 0.75 (but in practice there will be some error).
+Given a sufficiently large list of mutations and assuming an appropriate error structure, it is possible to determine the relative frequencies of different lineages.
+
+Freyja \citep{freyja}{part of iVar} and Alcov implement a linear regression based approach to deconvolution of mutation frequencies.
+Alcov uses an unconstrained linear regression approach, which is both easy to interpret and provides reasonable estimates despite not constraining the proportions to be positive or to sum to 1.
+Freya uses a robust approach and includes constraints to ensure positivity and sum-to-one.
+Both methods are parts of sophisticated sequence processing pipelines.
+
+In this paper, we introduce and implement an approach to deconvolution based on the binomial model to properly accommodate the error structure and implements positivity and sum-to-one constraints for valid estimates of proportions of lineages.
+The method is implemented in both a Bayesian and a constrained optimization framework, both of which have advantages for different situations.
+This method is a statistically sound and principled approach to estimation of proportions of lineages and is implemented in a user-friendly R package.
+
+\section{Background}
+
+\subsection{The Variant Matrix}
+
+We define the variant matrix $M$ as a matrix where the columns represent mutations and the rows represent variants.
+The $i,j$ entry is a 1 if mutation $j$ is present in variant $i$ and 0 otherwise.
+This provides a very convenient data structure for analysis which allows for matrix multiplication.
+We emphasize the importance of the variant matrix.
+The variants that are included and the mutations associated with those variants are of paramount importance, and we stress that poor specification can have a large impact on the results of any deconvolution algorithm.
+
+\subsection{Alcove and Freyja}
+
+In this section, we describe the methods of Alcove and Freyja in general terms.
+While not emphasizing its use, both approaches use a form of what we call the variant matrix. 
+Both methods rely on the functional form:
+
+\begin{equation}
+\text{\underline{Frequency}} = \underline \rho M + \underline \epsilon \label{OLS}
+\end{equation}
+
+\noindent where \underline{Frequency} is the vector of frequencies, $\underline \rho$ is the vector of proportions of each lineage, $M$ is the variant matrix, and $\underline \epsilon$ is the vector of errors.
+Alcov uses a closed form solution to ordinary least squares optimization of $\underline \rho$ in Equation \ref{OLS}.
+Freyja imposes positivity and sum-to-one constraints on $\rho$ and implements a bootstrap algorithm to robustly estimate a confidence interval around the estimates.
+
+\section{ProVoC}
+
+We introduce ProVoC, which implements a binomial error structure that properly incorporates the information from coverage and imposes the positivity and sum-to-one constraints.
+We first demonstrate the features of this method using a motivating example, then provide the specificiation of the model.
+
+\subsection{Motivating Example}
+
+% Use the example from the presentation. It's good.
+% This might be too "teachy" for a paper, though.
+
+\subsection{Model Specification}
+
+Our model assumes a binomial distribution for the counts (not the frequencies), where the binomial probability is calculated according to $\underline \rho X$ and the sample size is the coverage at the relevant position on the reference:
+
+$$
+\begin{aligned}
+\text{Count}_i &\sim \text{Binom}(p_i, \text{Coverage}_i)\\
+\underline p &= \underline M \times \rho
+\end{aligned}
+$$
+
+In this formulation, $\rho$ is a latent vector that must be estimated.
+Estimation is performed in two different ways.
+A Bayesian model allows for inspection of posterior distributions and posterior covariance, as well as providing a basis for more complex analyses (see Conclusions and Future Work).
+Note that the Bayesian model specification includes a Dirichlet prior to impose the positivity and sum-to-one constraints on $\rho$.
+A constrained optimization is also implemented, which fits much faster and a bootstrap resampling scheme allows for estimation of confidence intervals.
+
+\subsection{Residual Analysis}
+
+After obtaining an estimate of $\underline\rho$, which we label $\hat{\underline\rho}$, it is possible to obtain the expected counts of each mutation using the equation:
+$$\widehat{\text{\underline{Count}}} = \text{\underline{Coverage}}\odot\left(M\times\hat{\underline\rho}\right)$$
+
+\noindent where $\odot$ represents Hadamard (element-wise) multiplication.
+
+These residuals can hold important clues for possible omitted lineages.
+
+\section{Choosing Mutation Lists}
+
+\section{Application}
+
+\section{Conclusions}
+
+
+\end{document}
