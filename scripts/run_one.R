@@ -10,23 +10,38 @@ suppressPackageStartupMessages({
 })
 
 varmat_type <- c("constellations", "varmat_from_variants-all_voc", 
-    "varmat_from_variants-omicron_delta", "varmat_from_data")[3]
+    "varmat_from_variants-omicron_delta", "varmat_from_data")[4]
 method <- c("optim", "runjags")[1]
 
 animal <- read.csv(here("data/clean", "nml.csv")) 
-coco <- animal %>%
+coco_tmp <- animal %>%
     mutate(location = ifelse(grepl("MMN", sample), 
         yes = "MMN", 
         no = ifelse(grepl("MMS", sample),
             yes = "MMS",
             no = "VLI")),
         mutation = label,
-        coverage = alt_dp + ref_dp, # TODO: Is this correct for coverage?
+        coverage = total_dp, # TODO: Is this correct for coverage?
         count = round(frequency * coverage, 0))
 
 
-# (Optional) Choose one sample to run.
-coco <- filter(coco, sample == unique(coco$sample)[1])
+# Choose one sample to run.
+coco <- filter(coco_tmp, sample == unique(coco_tmp$sample)[3])
+cover <- read.csv(
+    paste0("data/coverage/", unique(coco_tmp$sample)[3], 
+        ".ivar_trim.sorted.bam_depth.tsv"), 
+    header = FALSE, sep = "\t")
+names(cover) <- c("specimen", "position", "coverage")
+
+cococo <- left_join(coco, cover, by = c("pos" = "position"))
+plot(cococo$coverage.x ~ cococo$coverage.y,
+    xlab = "Coverage from coverage file", 
+    ylab = "TOTAL_DP")
+abline(0, 1)
+
+plot(coverage ~ log(position + 1), data = cover, type = "l")
+points(coverage ~ log(pos + 1), data = coco, col = 2, pch = 16)
+
 
 
 if(varmat_type == "constellations") {
@@ -44,7 +59,7 @@ if(varmat_type == "constellations") {
         "B.1.617.2", "AY.1", "AY.2", "AY.4", "AY.4.2"), 
         mutation_format = "aa")
 } else {
-    varmat <- varmat_from_data(type = coco$type, pos = coco$pos, alt = coco$alt, max_n = 80, mutation_format = "aa")
+    varmat <- varmat_from_data(type = coco$type, pos = coco$pos, alt = coco$alt, max_n = 80, mutation_format = "aa", matches = 3)
 }
 
 fused <- fuse(coco, varmat)
