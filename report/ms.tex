@@ -71,6 +71,8 @@ This provides a very convenient data structure for analysis which allows for mat
 We emphasize the importance of the variant matrix.
 The variants that are included and the mutations associated with those variants are of paramount importance, and we stress that poor specification can have a large impact on the results of any deconvolution algorithm.
 
+% TODO: Equivalent variants given data
+
 \subsection{Alcove and Freyja}
 
 In this section, we describe the methods of Alcove and Freyja in general terms.
@@ -186,9 +188,69 @@ These residuals can hold important clues for possible omitted lineages.
 
 \section{Choosing Mutation Lists}
 
+\section{Simulation Study}
+
+To ensure our method is performing as expected, we have set up a simulation study that mimics real-world data.
+In this study, we compare our method to a re-implementation of Freyja and Alcov in the R programming language.
+We also compare our method against versions of Freyja and Alcov that use counts rather than frequencies (and thus use the binomial distribution), and apply a bootstrapping approach to obtain confidence intervals.
+Finally, we include a heuristic approach that estimates the proportion of a lineage using the average of representative mutations.
+
+\subsection{Simulating Wastewater Samples}
+
+To mimic real-world data, we use the following simulation setup.
+Instead of sampling from our mutation lists (which would ignore uncommon mutations and sequencing error), we sample from known sequences in the GenBank database.
+We assume that there is a true number of complete sequences in the wastewater, but this number is not something that we attempt to estimate.
+Instead, we sample a known proportion of the GenBank sequences that were assigned to a given lineage.
+For example, we may take 400 sequences at random from those labelled B.1.1.529 and 600 sequences labelled BA.1.
+
+From this collection of sequences, we can calculate the frequency of each mutation.
+We multiply these frequencies by a randomly chosen coverage map from our data in order to simulate a realistic coverage map.
+The result of this multiplication is a simulated set of counts of a simulated set of mutations, but with a fixed coverage map.
+
+We believe that this setup is realistic for several reasons.
+The mutations are sampled from real sequences which circumvents the need to have a mutation list.
+Because of this, mutations that only happen in a few sequences will still make it into our data.
+The use of real-life coverage maps means that we properly emulate the coverage obtained via the ARTIC protocol (which is the industry standard despite having potential lack of coverage of the spike protein) after RNA degredation (which recent studies have found to not be uniform across the genome) 
+
+\subsection{Parameter Setup}
+
+To simulate the data, we only need to choose the number of sequences of each lineage that we are sampling.
+We consider a gradient between Delta (and its sublineages) and Omicron (and its sublineages), as shown in the Figure \ref{deltacron}.
+These prorportions are based on \cite{David's invasion paper}.
+To emulate sequencing error, 1\% of each sample is from the rest of the GenBank data (i.e., neither Delta nor Omicron).
+To emulate the conditions of the start of a transition, we will restrict our sequences to those collected prior to the dates shown in the plot.
+
+\begin{figure}
+Delta to Omicron
+\caption{\label{deltacron}The proportion of each lineage in the simulated data. 1\% of all sequences sampled will be ``Other'' to emulate sequencing error.}
+\end{figure}
+
+Constructing the mutation lists is non-trivial.
+Thanks to the version control system (git/GitHub) used by the PANGO team, we are able to ``go back in time'' and use the mutation lists available at the given dates.
+For the mutation lists based on the GenBank data, we can subset the GenBank data to what was available at the time.
+However, GenBank's labels have changed over time and we cannot emulate this.
+
+
+\subsection{Results}
+
+The results are fourthcoming... thirdcoming... secondcoming... firstcoming... INCOMING!
+
+
+
+
 \section{Application}
 
-\section{Conclusions}
+\subsection{Data Description}
 
+\subsection{Results}
+
+(By variantmat type - known lineages versus constellations)
+
+\subsubsection{Sensitivity to Inclusion of Lineages}
+
+\section{Conclusions and Future Work}
+
+
+We are actively pursuing a version of the Bayesian model which imposes similarity of proportions based on distance in time and in space.
 
 \end{document}
