@@ -10,7 +10,7 @@ suppressPackageStartupMessages({
 })
 
 varmat_type <- c("constellations", "varmat_from_variants-all_voc", 
-    "varmat_from_variants-omicron_delta", "varmat_from_data")[4]
+    "varmat_from_variants-omicron_delta", "varmat_from_data")[1]
 method <- c("optim", "runjags")[1]
 
 animal <- read.csv(here("data/clean", "nml.csv")) 
@@ -37,11 +37,7 @@ cococo <- left_join(coco, cover, by = c("pos" = "position"))
 plot(cococo$coverage.x ~ cococo$coverage.y,
     xlab = "Coverage from coverage file", 
     ylab = "TOTAL_DP")
-abline(0, 1)
-
-plot(coverage ~ log(position + 1), data = cover, type = "l")
-points(coverage ~ log(pos + 1), data = coco, col = 2, pch = 16)
-
+abline(0, 1) # There's a problem here - ignoring for now.
 
 
 if(varmat_type == "constellations") {
@@ -61,6 +57,8 @@ if(varmat_type == "constellations") {
 } else {
     varmat <- varmat_from_data(type = coco$type, pos = coco$pos, alt = coco$alt, max_n = 80, mutation_format = "aa", matches = 3)
 }
+
+coco2 <- add_coverage(coco, cover, colnames(varmat))
 
 fused <- fuse(coco, varmat)
 res <- provoc(fused = fused, method = method)
