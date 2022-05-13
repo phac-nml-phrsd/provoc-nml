@@ -119,7 +119,8 @@ $$\widehat{\text{\underline{Count}}} = \text{\underline{Coverage}}\odot\left(M\t
 
 \noindent where $\odot$ represents Hadamard (element-wise) multiplication.
 
-These residuals can hold important clues for possible omitted lineages.
+These residuals can hold important clues for potential misspecification of the variant matrix.
+If there are mutations that have high prevalence in the data but low prevalence in the expected counts, this might indicate that it is a representative mutation from a lineage that is not present in the data. 
 
 \section{Choosing Mutation Lists}
 
