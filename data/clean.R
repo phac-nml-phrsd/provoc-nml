@@ -16,7 +16,7 @@ animal <- nml %>%
     select(
         sample = Sample, region = REGION, date = Date,
         pos = POS, alt = ALT, ref = REF, frequency = ALT_FREQ, 
-        alt_dp = ALT_DP, ref_dp = REF_DP, 
+        alt_dp = ALT_DP, ref_dp = REF_DP,  total_dp = TOTAL_DP,
         ref_aa = REF_AA, alt_codon = ALT_CODON, alt_aa = ALT_AA) %>%
     mutate(
         date = ymd(date),

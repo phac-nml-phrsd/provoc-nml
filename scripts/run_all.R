@@ -25,7 +25,7 @@ coco <- animal %>%
 varmat_types <- c("constellations", "varmat_from_variants-all_voc", "varmat_from_variants-omicron_delta", "varmat_from_data")
 varmat_type <- varmat_types[4]
 
-for(varmat_type in varmat_types[1:3]) { # varmat_from_data causes errors - probably too big or with too many minor mutations
+for(varmat_type in varmat_types[1:4]) { # varmat_from_data causes errors - probably too big or with too many minor mutations
 
     handle <- paste0("results/", varmat_type, ".RDS")
     if(file.exists(handle) & !force_refit) {
