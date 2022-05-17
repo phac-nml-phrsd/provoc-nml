@@ -189,6 +189,25 @@ If there are mutations that have high prevalence in the data but low prevalence 
 
 \section{Choosing Mutation Lists}
 
+The primary method of building a mutation list is to use the curated lists for variants of concern at \url{https://github.com/cov-lineages/constellations}.
+This list is updated regularly and version controlled, so it is possible to revert the lists back to a previous state.
+This is very helpful to ensure that, for instance, we are not looking for BA.4 in samples taken before Omicron was first observed.
+
+Mutations lists can also be found by defining a list of variants to be searched for and then using NextStrain Genbank data \citep(needed) to find the mutations that belong to each variant.
+The accompanying R package includes a pre-built list of mutations and a function to facilitate this.
+The user can define the percentage of observed sequences that contain a given mutation before it's included in the list.
+They can also input the date of the study, and the mutation list will only contain mutations that were observed in that lineage both before and after the sample was collected (mutations observed in the last two months are considered to be still active).
+
+Finally, mutation lists can be defined by the data.
+That is, the mutations in the data are searched in the GenBank database.
+If a mutation was present in a pre-specified percentage of sequences assigned to a given lineage (possibly by date), then that lineage is recorded.
+The recorded lineages are then processed as lineage lists as in the previous paragraph.
+
+The three strategies can be summarized as a curated list of mutations, a user-specified list of lineages, and an empirical list of lineages.
+The curated list has the advantage of being readily available and subject to vibrant discussion and scrutiny, but may not contain all of the lineages that a researcher is interested in.
+Furthermore, the mutations are chosen to have as little overlap as possible with other lineages, which is not necessary for the methods studied in this paper.
+Both methods that are based on GenBank data are nearly exhaustive in terms of observed mutations, but may include too many mutations and will slow down computation time.
+
 \section{Simulation Study}
 
 To ensure our method is performing as expected, we have set up a simulation study that mimics real-world data.
