@@ -2,6 +2,7 @@ library(lubridate)
 library(ggplot2)
 library(dplyr)
 
+# https://health-infobase.canada.ca/src/data/covidLive/covid19-epiSummary-variants.csv
 variants <- read.csv("data/covid19-epiSummary-variants.csv") %>% 
     rename(variant = Variant.Grouping, identifier = X_Identifier,
         lineage = Lineage.Grouped, percent = X.CT.Count.of.Sample..,
@@ -52,3 +53,15 @@ variants %>%
         labs(x = "Date", y = "Percent of CT Samples") +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust = 1))
+
+# Proportions every other week
+dates <- ymd("2021-05-30") + 14*(0:5)
+var_params <- variants %>%
+    filter(week %in% as.character(dates)) %>%
+    group_by(lineage) %>%
+    mutate(max_perc = rep(max(percent), n())) %>%
+    ungroup() %>%
+    filter(max_perc > 0.01) %>%
+    select(-max_perc)
+
+write.csv(var_params, file = "data/clean/variant_params.csv")
