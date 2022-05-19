@@ -217,6 +217,7 @@ The use of real-life coverage maps means that we properly emulate the coverage o
 
 To simulate the data, we only need to choose the number of sequences of each lineage that we are sampling.
 We consider a gradient between Delta (and its sublineages) and Omicron (and its sublineages), as shown in the Figure \ref{deltacron}.
+We also consider a situation where Delta and Omicron do not make up the entire sample but the variant matrices only contain Delta and Omicron in order to test the models' ability to estimate proportions that are less than 1.
 These prorportions are based on \cite{David's invasion paper}.
 To emulate sequencing error, 1\% of each sample is from the rest of the GenBank data (i.e., neither Delta nor Omicron).
 To emulate the conditions of the start of a transition, we will restrict our sequences to those collected prior to the dates shown in the plot.
@@ -229,13 +230,10 @@ Delta to Omicron
 Constructing the mutation lists is non-trivial.
 Thanks to the version control system (git/GitHub) used by the PANGO team, we are able to ``go back in time'' and use the mutation lists available at the given dates.
 For the mutation lists based on the GenBank data, we can subset the GenBank data to what was available at the time.
-However, GenBank's labels have changed over time and we cannot emulate this.
+However, GenBank's labels have changed over time and we unfortunately cannot emulate this.
 
 
 \subsection{Results}
-
-The results are fourthcoming... thirdcoming... secondcoming... firstcoming... INCOMING!
-
 
 
 
