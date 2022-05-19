@@ -4,6 +4,7 @@ data/raw/*
 !data/raw/_placeholder
 data/coverage/*
 !data/coverage/placeholder
+data/covid19*
 
 output/*.RDS
 results/*.RDS
