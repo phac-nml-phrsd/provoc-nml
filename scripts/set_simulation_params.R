@@ -65,3 +65,4 @@ var_params <- variants %>%
     select(-max_perc)
 
 write.csv(var_params, file = "data/clean/variant_params.csv")
+
