@@ -2,6 +2,7 @@
 
 library(provoc)
 library(lubridate)
+library(dplyr)
 
 N <- 1000
 
@@ -20,12 +21,17 @@ parse_genbank <- function(mut) {
 }
 
 sample_for_varmat <- function(lineage, count) {
-    mlin <- mutations_by_lineage[mutations_by_lineage$lineage == lineage, ]
+    if(lineage == "Other Delta") {
+        mlin <- mutations_by_lineage[grepl("AY.", mutations_by_lineage$lineage), ]
+    } else {
+        mlin <- mutations_by_lineage[mutations_by_lineage$lineage == lineage, ]
+    }
     muts <- sample(mlin$mutation, count, replace = TRUE, prob = mlin$count/sum(mlin$count))
     muts <- t(sapply(muts, parse_genbank))
     muts <- muts[complete.cases(muts),, drop = FALSE]
-    muts <- sapply(1:n, function(x){
+    muts <- sapply(1:nrow(muts), function(x){
         provoc:::parse_mutation(muts[x,1], muts[x,2], muts[x,3])})
+    unique(muts)
 }
 
 sample_varmat <- function(lineages, counts) {
@@ -38,11 +44,38 @@ variants <- read.csv("data/clean/var_params.csv")
 
 for(date in unique(variants$week)) {
     day_vars <- variants[variants$week == ymd(date),]
-    varmat <- sample_varmat(lineages = day_vars$lineage, 
-        counts = round(day_vars$percent*N))
-    coco <- simulate_coco(varmat, verbose = FALSE)
+    for(rep in 1:10) {
+        sampled_varmat <- sample_varmat(lineages = day_vars$lineage, 
+            counts = round(day_vars$percent*N))
+        coco <- simulate_coco(sampled_varmat, verbose = FALSE, 
+            rel_counts = round(day_vars$percent*N))
+        varmat <- astronomize()
+        fused <- fuse(coco, varmat, verbose = FALSE)
+        fused <- fused[fused$coverage > 0,]
+        # Fuse to ensure same mutation list with correct order
+        cocovar <- provoc:::fission(fused)
+        coco <- cocovar$coco
+        varmat <- cocovar$varmat
+        all_res_tmp <- bind_rows(
+            alcov(coco, varmat, method = "lm"),
+            alcov(coco, varmat, method = "robust"),
+            alcov(coco, varmat, method = "nnls"),
+            freyja(coco, varmat),
+            avg_freq(fused, method = "simple"),
+            #avg_freq(fused, method = "binomial"),
+            #avg_freq(fused, method = "quasibinomial"),
+            provoc_optim2(coco, varmat)
+        )
+        all_res_tmp$iter <- i
+        if(i == 1) {
+            all_res <- all_res_tmp
+        } else {
+            all_res <- bind_rows(all_res, all_res_tmp)
+        }
+    }
 }
 
+head(all_res)
 
 
 
