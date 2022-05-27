@@ -11,7 +11,7 @@ suppressPackageStartupMessages({
 
 varmat_type <- c("constellations", "varmat_from_variants-all_voc", 
     "varmat_from_variants-omicron_delta", "varmat_from_data")[1]
-method <- c("optim", "runjags")[1]
+method <- c("optim", "runjags")[2]
 
 animal <- read.csv(here("data/clean", "nml.csv")) 
 coco_tmp <- animal %>%
@@ -61,13 +61,16 @@ if(varmat_type == "constellations") {
 coco2 <- add_coverage(coco, cover, colnames(varmat))
 
 fused <- fuse(coco, varmat)
-res <- provoc(fused = fused, method = method)
+res <- provoc(fused = fused, method = method,
+    adapt = 2000, burnin = 2000, sample = 1000, thin = 10, bootstrap_samples = 100)
 
 res %>% 
-    ggplot(aes(x = variant, y = rho)) + 
-        geom_point() + 
+    ggplot(aes(x = variant, y = rho, ymin = ci_low, ymax = ci_high)) + 
+        geom_point() + geom_errorbar() + 
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5)) +
-        labs(title = "Results from Optim") +
+        labs(title = ifelse(method == "optim", 
+            "Results from Optim with Bootstrap 95% CI",
+            "Results from RunJAGS with 95% Credible Interval")) +
         coord_flip()
 
 var2 <- varmat[res$variant,]
