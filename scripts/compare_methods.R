@@ -2,7 +2,7 @@
 library(nnls)
 
 
-alcov <- function(coco, varmat, method = c("lm", "robust", "nnls")) {
+alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NNLS")) {
     if(any(coco$coverage == 0)) {
         varmat <- varmat[, coco$coverage != 0]
         coco <- coco[coco$coverage != 0,]
@@ -11,17 +11,17 @@ alcov <- function(coco, varmat, method = c("lm", "robust", "nnls")) {
     df <- as.data.frame(t(varmat))
     df$freq <- freqs
 
-    if(method[1] == "lm") {
+    if(method[1] == "AlCoV-LM") {
         res <- summary(lm(freq ~ 0 + ., data = df))$coef[, 1:2]
         res <- data.frame(variant = rownames(res), rho = res[,1], se = res[,2], 
             method = method)
         row.names(res) <- NULL
-    } else if(method[1] == "robust"){
+    } else if(method[1] == "AlCoV-Robust"){
         res <- summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2]
         res <- data.frame(variant = rownames(res), rho = res[,1], se = res[,2], 
             method = method)
         row.names(res) <- NULL
-    } else if(method[1] == "nnls"){
+    } else if(method[1] == "AlCoV-NNLS"){
         freqs[freqs == 0] <- 0.0001
         res <- data.frame(variant = rownames(varmat),
             rho = nnls(t(varmat), freqs)$x, 
@@ -64,10 +64,10 @@ freyja <- function(coco, varmat) {
         ui = ui, ci = ci,
         count = coco$count, coverage = coco$coverage, varmat = varmat,
         control = list(maxit = 10000))
-    data.frame(variant = rownames(varmat), rho = res$par, method = "freyja")
+    data.frame(variant = rownames(varmat), rho = res$par, method = "Freyja")
 }
 
-avg_freq <- function(fused, method = c("simple", "binomial", "quasibinomial")) {
+avg_freq <- function(fused, method = c("Simple Avg", "binomial", "quasibinomial")) {
     vars <- which(startsWith(colnames(fused), "var_"))
     avg <- c()
     se <- c()
@@ -75,9 +75,14 @@ avg_freq <- function(fused, method = c("simple", "binomial", "quasibinomial")) {
         others <- vars[vars != i]
         sub_fuse <- fused[fused[,i] == 1 &
             apply(fused[, others], 1, sum) == 0,]
-        if(method[1] == "simple") {
-            avg <- c(avg, mean(sub_fuse$count/sub_fuse$coverage))
-            se <- c(se, NA)
+        if(method[1] == "Simple Avg") {
+            if(nrow(sub_fuse) < 1) {
+                avg <- c(avg, 0)
+                se <- c(se, NA)
+            } else {
+                avg <- c(avg, mean(sub_fuse$count/sub_fuse$coverage))
+                se <- c(se, NA)
+            }
         } else {
             res <- glm(cbind(count, coverage - count) ~ 1, 
                 data = sub_fuse, 
@@ -103,17 +108,18 @@ provoc_optim2 <- function(coco, varmat) {
             res <- data.frame(variant = rownames(varmat), rho = NA)
         }
     }
-    res$method <- "provoc"
+    res$method <- "ProVoC"
     res
 }
 
 
 varmat <- astronomize()
-varmat <- varmat[rownames(varmat) %in% c("BA.1", "BA.2", "B.1.1.529"), ]
+varmat <- varmat[rownames(varmat) %in% c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2", "B.1.617.2+K417N"), ]
 varmat <- varmat[, apply(varmat, 2, sum) > 0]
+rownames(varmat) <- gsub("\\+", "_", rownames(varmat))
 true_vals <- data.frame(
     variant = row.names(varmat),
-    prob = c(0.6, 0.3, 0.1)
+    prob = c(0.3, 0.2, 0.1, 0.35, 0.05)
 )
 rel_counts <- round(true_vals$prob * 500)
 
@@ -126,11 +132,11 @@ for(i in 1:1000) {
     coco <- cocovar$coco
     varmat <- cocovar$varmat
     all_res_tmp <- bind_rows(
-        alcov(coco, varmat, method = "lm"),
-        alcov(coco, varmat, method = "robust"),
-        alcov(coco, varmat, method = "nnls"),
+        alcov(coco, varmat, method = "AlCoV-LM"),
+        alcov(coco, varmat, method = "AlCoV-Robust"),
+        alcov(coco, varmat, method = "AlCoV-NNLS"),
         freyja(coco, varmat),
-        avg_freq(fused, method = "simple"),
+        avg_freq(fused, method = "Simple Avg"),
         #avg_freq(fused, method = "binomial"),
         #avg_freq(fused, method = "quasibinomial"),
         provoc_optim2(coco, varmat)
@@ -148,10 +154,14 @@ all_res <- left_join(all_res, true_vals, by = "variant")
 ggplot(all_res, aes(x = method, y = rho, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
     facet_wrap(~ variant, scales = "free_y") +
-    geom_hline(aes(yintercept = prob, group = variant))
+    geom_hline(aes(yintercept = prob, group = variant)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+    geom_hline(yintercept = 0, linetype = "dashed")
 
-ggplot(all_res) +
+ggplot(filter(all_res, !is.na(method))) +
     aes(x = method, y = rho - prob, fill = variant) +
+    geom_hline(yintercept = 0, linetype = "dashed") +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
-    labs(x = NULL, y = "Error") +
-    geom_hline(yintercept = 0)
+    labs(x = NULL, y = "Error",
+        title = "Simulation Results",
+        subtitle = "Simulated samples from Constellations\nProVoC has lowest variance")
