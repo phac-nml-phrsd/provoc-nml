@@ -80,7 +80,11 @@ avg_freq <- function(fused, method = c("Simple Avg", "binomial", "quasibinomial"
                 avg <- c(avg, 0)
                 se <- c(se, NA)
             } else {
-                avg <- c(avg, mean(sub_fuse$count/sub_fuse$coverage))
+                counts <- sub_fuse$count
+                covers <- sub_fuse$coverage
+                avg_tmp <- counts/covers
+                avg_tmp[covers == 0] <- 0
+                avg <- c(avg, mean(avg_tmp))
                 se <- c(se, NA)
             }
         } else {
