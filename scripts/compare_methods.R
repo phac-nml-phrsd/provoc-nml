@@ -74,7 +74,7 @@ avg_freq <- function(fused, method = c("Simple Avg", "binomial", "quasibinomial"
     for(i in vars) {
         others <- vars[vars != i]
         sub_fuse <- fused[fused[,i] == 1 &
-            apply(fused[, others], 1, sum) == 0,]
+            apply(fused[, others, drop = FALSE], 1, sum) == 0,]
         if(method[1] == "Simple Avg") {
             if(nrow(sub_fuse) < 1) {
                 avg <- c(avg, 0)
@@ -115,11 +115,13 @@ provoc_optim2 <- function(coco, varmat) {
 
 varmat <- astronomize()
 varmat <- varmat[rownames(varmat) %in% c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2", "B.1.617.2+K417N"), ]
+varmat <- varmat[rownames(varmat) %in% c("B.1.617.2", "B.1.617.2+K417N"), ]
 varmat <- varmat[, apply(varmat, 2, sum) > 0]
 rownames(varmat) <- gsub("\\+", "_", rownames(varmat))
 true_vals <- data.frame(
     variant = row.names(varmat),
-    prob = c(0.3, 0.2, 0.1, 0.35, 0.05)
+    #prob = c(0.3, 0.2, 0.1, 0.35, 0.05)
+    prob = c(0.97, 0.03)
 )
 rel_counts <- round(true_vals$prob * 500)
 
@@ -155,8 +157,8 @@ ggplot(all_res, aes(x = method, y = rho, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
     facet_wrap(~ variant, scales = "free_y") +
     geom_hline(aes(yintercept = prob, group = variant)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-    geom_hline(yintercept = 0, linetype = "dashed")
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) #+
+    #geom_hline(yintercept = 0, linetype = "dashed")
 
 ggplot(filter(all_res, !is.na(method))) +
     aes(x = method, y = rho - prob, fill = variant) +
