@@ -25,7 +25,7 @@ for(week in weeks) {
     varmat_true <- varmat[rownames(varmat) %in% rownames(varmat_data) | 
         rownames(varmat) %in% Other_Delta,]
 
-    for(replicate in 1:N) {
+    for(replicates in 1:N) {
         # Add in "Other Delta" completelty at random
         relative <- data.frame(lineage = rownames(varmat_true)) %>%
             left_join(these_pars[, c("lineage", "percent")], by = "lineage")
@@ -41,22 +41,25 @@ for(week in weeks) {
         varmat <- cocovar$varmat
         all_res_tmp <- bind_rows(
             alcov(coco, varmat, method = "AlCoV-LM"),
-            alcov(coco, varmat, method = "AlCoV-Robust"),
+            tryCatch(alcov(coco, varmat, method = "AlCoV-Robust"), 
+                error = function(e) data.frame(rho = NULL)),
             alcov(coco, varmat, method = "AlCoV-NNLS"),
             freyja(coco, varmat),
             avg_freq(fused, method = "Simple Avg"),
             #avg_freq(fused, method = "binomial"),
             #avg_freq(fused, method = "quasibinomial"),
-            provoc_optim2(coco, varmat)
+            provoc_optim2(coco, varmat),
+            scaled_squared_counts(coco, varmat),
+            squared_counts(coco, varmat)
         )
-        all_res_tmp$iter <- replicate
+        all_res_tmp$iter <- replicates
         all_res_tmp$week <- week
         all_res_tmp$week <- as.character(all_res_tmp$week)
         all_res_tmp2 <- all_res_tmp %>%
             group_by(method, iter, week) %>%
             summarise(rho = sum(rho), variant = rep("total", n()), .groups = "drop") %>%
             bind_rows(all_res_tmp)
-        if(replicate == 1 & week == weeks[1]) {
+        if(replicates == 1 & week == weeks[1]) {
             all_res <- all_res_tmp2
         } else {
             all_res <- bind_rows(all_res, all_res_tmp2)
