@@ -6,47 +6,58 @@ library(ggplot2)
 theme_set(theme_bw())
 
 alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NNLS")) {
-    if(any(coco$coverage == 0)) {
-        varmat <- varmat[, coco$coverage != 0]
-        coco <- coco[coco$coverage != 0,]
-    }
     freqs <- coco$count/coco$coverage
     df <- as.data.frame(t(varmat))
     df$freq <- freqs
 
-    if(method[1] == "AlCoV-LM") {
-        res <- summary(lm(freq ~ 0 + ., data = df))$coef[, 1:2]
+    bind_rows(lapply(method, function(methi) {
+        if(methi == "AlCoV-LM") {
+            res <- summary(lm(freq ~ 0 + ., data = df))$coef[, 1:2]
+        } else if(methi == "AlCoV-Robust"){
+            res <- tryCatch(summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2],
+                error = function(e) data.frame(NA, NA))
+        } else if(methi == "AlCoV-NNLS"){
+            freqs[freqs == 0] <- 0.0001
+            res <- cbind(nnls(t(varmat), freqs)$x, NA)
+            rownames(res) <- rownames(varmat)
+        }
         res <- data.frame(variant = rownames(res), rho = res[,1], se = res[,2], 
-            method = method)
+            method = methi)
         row.names(res) <- NULL
-    } else if(method[1] == "AlCoV-Robust"){
-        res <- summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2]
-        res <- data.frame(variant = rownames(res), rho = res[,1], se = res[,2], 
-            method = method)
-        row.names(res) <- NULL
-    } else if(method[1] == "AlCoV-NNLS"){
-        freqs[freqs == 0] <- 0.0001
-        res <- data.frame(variant = rownames(varmat),
-            rho = nnls(t(varmat), freqs)$x, 
-            method = method)
-        row.names(res) <- NULL
-    } 
-    res
+        res
+    }))
 }
 
-freyja <- function(coco, varmat) {
+optim_methods <- function(coco, varmat, 
+        method = c("freyja", "provoc", "squared", "squared_scaled")) {
     rho_init <- provoc:::rho_initializer(varmat)
 
-    objective <- function(rho, count, varmat, coverage) {
+    objective <- function(rho, count, varmat, coverage, methi) {
         freq <- count/coverage
         prob <- as.numeric(rho %*% varmat)
         prob[coverage == 0] <- 0
         prob[prob == 0 & count != 0] <- 0.000001
         if(any(is.na(freq))) {
             prob <- prob[!is.na(freq)]
+            count <- count[!is.na(freq)]
+            coverage <- coverage[!is.na(freq)]
             freq <- freq[!is.na(freq)]
         }
-        sum(abs(freq - prob))
+        if(methi == "freyja"){
+            return(sum(abs(freq - prob)))
+        } else if(methi == "provoc") {
+            return(-sum(stats::dbinom(x = count, size = coverage, 
+                prob = prob, log = TRUE)))
+        } else if(methi %in% c("squared", "squared_scaled")) {
+            preds <- prob * coverage
+            denom <- if(methi == "squared") {
+                rep(1, length(preds))
+            } else { 
+                coverage*prob*(1-prob)
+            }
+            denom[preds-count == 0] <- 1
+            return(sum((preds - count)^2/(denom)))
+        }
     }
 
     # Constraints will kill me --------------------------------
@@ -62,12 +73,14 @@ freyja <- function(coco, varmat) {
     ci <- c(c_sum1, c_p0)
 
 
-    res <- stats::constrOptim(rho_init,
-        f = objective, grad = NULL,
-        ui = ui, ci = ci,
-        count = coco$count, coverage = coco$coverage, varmat = varmat,
-        control = list(maxit = 10000))
-    data.frame(variant = rownames(varmat), rho = res$par, method = "Freyja")
+    bind_rows(lapply(method, function(meth) {
+        res <- stats::constrOptim(rho_init,
+            f = objective, grad = NULL,
+            ui = ui, ci = ci,
+            count = coco$count, coverage = coco$coverage, varmat = varmat,
+            methi = meth,
+            control = list(maxit = 10000))
+        data.frame(variant = rownames(varmat), rho = res$par, method = meth)}))
 }
 
 avg_freq <- function(fused, method = c("Simple Avg", "binomial", "quasibinomial")) {
@@ -103,100 +116,6 @@ avg_freq <- function(fused, method = c("Simple Avg", "binomial", "quasibinomial"
         rho = avg,
         se = se,
         method = method)
-}
-
-provoc_optim2 <- function(coco, varmat) {
-    res <- tryCatch(provoc_optim(coco, varmat)$res_df, 
-        error = function(e) e)
-    if("error" %in% class(res)) {
-        res <- tryCatch(provoc_optim(coco, varmat)$res_df, 
-            error = function(e) e)
-        if("error" %in% class(res)) {
-            res <- data.frame(variant = rownames(varmat), rho = NA)
-        }
-    }
-    res$method <- "ProVoC"
-    res
-}
-
-scaled_squared_counts <- function(coco, varmat) {
-    rho_init <- provoc:::rho_initializer(varmat)
-
-    objective <- function(rho, count, varmat, coverage) {
-        freq <- count/coverage
-        prob <- as.numeric(rho %*% varmat)
-        prob[coverage == 0] <- 0
-        prob[prob == 0 & count != 0] <- 0.00001
-        if(any(is.na(freq))) {
-            prob <- prob[!is.na(freq)]
-            count <- count[!is.na(freq)]
-            coverage <- coverage[!is.na(freq)]
-            freq <- freq[!is.na(freq)]
-        }
-        preds <- prob * coverage
-        denom <- coverage*prob*(1-prob)
-        denom[preds-count == 0] <- 1
-        sum((preds - count)^2/(denom))
-    }
-
-    # Constraints will kill me --------------------------------
-    # sum(p) < 1 => sum(p) - 1 < 0 => -sum(p) + 1 > 0
-    u_sum1 <- rep(-1, length(rho_init))
-    c_sum1 <- -1
-
-    # p_i > 0 => 1p_i + 0p_j > 0
-    u_p0 <- diag(length(rho_init))
-    c_p0 <- rep(0, length(rho_init))
-
-    ui <- rbind(u_sum1, u_p0)
-    ci <- c(c_sum1, c_p0)
-
-
-    res <- stats::constrOptim(rho_init,
-        f = objective, grad = NULL,
-        ui = ui, ci = ci,
-        count = coco$count, coverage = coco$coverage, varmat = varmat,
-        control = list(maxit = 10000))
-    data.frame(variant = rownames(varmat), rho = res$par, method = "Scaled_Squared_Counts")
-}
-
-squared_counts <- function(coco, varmat) {
-    rho_init <- provoc:::rho_initializer(varmat)
-
-    objective <- function(rho, count, varmat, coverage) {
-        freq <- count/coverage
-        prob <- as.numeric(rho %*% varmat)
-        prob[coverage == 0] <- 0
-        prob[prob == 0 & count != 0] <- 0.00001
-        if(any(is.na(freq))) {
-            prob <- prob[!is.na(freq)]
-            count <- count[!is.na(freq)]
-            coverage <- coverage[!is.na(freq)]
-            freq <- freq[!is.na(freq)]
-        }
-        preds <- prob * coverage
-        sum((preds - count)^2)
-    }
-
-    # Constraints will kill me --------------------------------
-    # sum(p) < 1 => sum(p) - 1 < 0 => -sum(p) + 1 > 0
-    u_sum1 <- rep(-1, length(rho_init))
-    c_sum1 <- -1
-
-    # p_i > 0 => 1p_i + 0p_j > 0
-    u_p0 <- diag(length(rho_init))
-    c_p0 <- rep(0, length(rho_init))
-
-    ui <- rbind(u_sum1, u_p0)
-    ci <- c(c_sum1, c_p0)
-
-
-    res <- stats::constrOptim(rho_init,
-        f = objective, grad = NULL,
-        ui = ui, ci = ci,
-        count = coco$count, coverage = coco$coverage, varmat = varmat,
-        control = list(maxit = 10000))
-    data.frame(variant = rownames(varmat), rho = res$par, method = "Squared_Counts")
 }
 
 
@@ -249,22 +168,15 @@ for (scenario in names(truth)) {
     for(i in 1:100) {
         coco <- simulate_coco(varmat, rel_counts = rel_counts, verbose = FALSE)
         fused <- fuse(coco, varmat2, verbose = FALSE)
+        fused <- filter(fused, coverage > 0)
         # Fuse to ensure same mutation list with correct order
         cocovar <- provoc:::fission(fused)
         coco <- cocovar$coco
         varmat2 <- cocovar$varmat
         all_res_tmp <- bind_rows(
-            alcov(coco, varmat2, method = "AlCoV-LM"),
-            tryCatch(alcov(coco, varmat2, method = "AlCoV-Robust"), 
-                error = function(e) data.frame(rho = NA)),
-            alcov(coco, varmat2, method = "AlCoV-NNLS"),
-            freyja(coco, varmat2),
-            avg_freq(fused, method = "Simple Avg"),
-            #avg_freq(fused, method = "binomial"),
-            #avg_freq(fused, method = "quasibinomial"),
-            provoc_optim2(coco, varmat2),
-            scaled_squared_counts(coco, varmat2),
-            squared_counts(coco, varmat2)
+            alcov(coco, varmat2),
+            optim_methods(coco, varmat2),
+            avg_freq(fused, method = "Simple Avg")
         )
         all_res_tmp$iter <- i
         if(i == 1) {
