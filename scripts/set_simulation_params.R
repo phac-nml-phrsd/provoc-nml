@@ -19,7 +19,7 @@ variants %>%
         theme_bw() +
         theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
-dates <- ymd("2021-05-30") + 7*(0:10)
+dates <- ymd("2021-05-09") + 7*(0:10)
 variants %>%
     filter(week %in% as.character(dates)) %>%
     group_by(lineage) %>%
@@ -55,7 +55,7 @@ variants %>%
         theme(axis.text.x = element_text(angle = 40, vjust = 1, hjust = 1))
 
 # Proportions every other week
-dates <- ymd("2021-05-30") + 14*(0:5)
+dates <- ymd("2021-05-09") + 14*(0:5)
 var_params <- variants %>%
     filter(week %in% as.character(dates)) %>%
     group_by(lineage) %>%

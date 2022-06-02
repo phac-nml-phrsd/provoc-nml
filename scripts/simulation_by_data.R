@@ -5,8 +5,8 @@ library(provoc)
 library(nnls)
 
 params <- read.csv("data/clean/variant_params.csv")
-N <- 1000
-total_seqs <- 5000
+N <- 50
+total_seqs <- 1000
 weeks <- unique(params$week)
 
 for(week in weeks) {
@@ -19,10 +19,8 @@ for(week in weeks) {
     varmat <- as.matrix(bind_rows(as.data.frame(pango_vars), as.data.frame(delta_vars)))
     varmat[is.na(varmat)] <- 0
     varmat_data <- varmat[row.names(varmat) %in% these_pars$lineage,]
-    cbind(these_pars$lineage, these_pars$lineage %in% row.names(varmat_data))
-    sum(these_pars$percent[these_pars$lineage %in% row.names(varmat_data)]) + these_pars$percent[these_pars$lineage == "Other Delta"]
 
-    Other_Delta <- grep("^AY", row.names(delta_vars), value = TRUE)
+    Other_Delta <- grep("AY", row.names(delta_vars), value = TRUE)
     Other_Delta <- Other_Delta[!Other_Delta %in% rownames(varmat_data)]
     varmat_true <- varmat[rownames(varmat) %in% rownames(varmat_data) | 
         rownames(varmat) %in% Other_Delta,]
@@ -54,18 +52,29 @@ for(week in weeks) {
         all_res_tmp$iter <- replicate
         all_res_tmp$week <- week
         all_res_tmp$week <- as.character(all_res_tmp$week)
+        all_res_tmp2 <- all_res_tmp %>%
+            group_by(method, iter, week) %>%
+            summarise(rho = sum(rho), variant = rep("total", n()), .groups = "drop") %>%
+            bind_rows(all_res_tmp)
         if(replicate == 1 & week == weeks[1]) {
-            all_res <- all_res_tmp
+            all_res <- all_res_tmp2
         } else {
-            all_res <- bind_rows(all_res, all_res_tmp)
+            all_res <- bind_rows(all_res, all_res_tmp2)
         }
     }
 }
-params2 <- select(params, variant = lineage, true_perc = percent, week)
+params1 <- select(params, variant = lineage, true_perc = percent, week)
+params2 <- params1 %>%
+    filter(variant %in% rownames(varmat_data)) %>%
+    group_by(week) %>%
+    summarise(variant = "total", true_perc = sum(true_perc), .groups = "drop") %>%
+    bind_rows(params1)
 all_res2 <- left_join(all_res, params2, by = c("variant", "week"))
 
 ggplot(all_res2) +
     aes(x = method, y = rho, colour = method) + 
+    geom_hline(yintercept = c(0,1), colour = "darkgrey", linetype = "dashed") + 
     geom_violin() + geom_hline(mapping = aes(yintercept = true_perc)) + 
     facet_grid(week ~ variant) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+    scale_y_continuous(breaks = seq(0, 1, 0.2), minor_breaks = seq(0, 1, 0.1))

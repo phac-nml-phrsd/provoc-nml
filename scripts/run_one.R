@@ -62,7 +62,7 @@ coco2 <- add_coverage(coco, cover, colnames(varmat))
 
 fused <- fuse(coco, varmat)
 res <- provoc(fused = fused, method = method,
-    adapt = 2000, burnin = 2000, sample = 1000, thin = 10, bootstrap_samples = 100)
+    adapt = 2000, burnin = 2000, sample = 1000, thin = 10, bootstrap_samples = 500)
 
 res %>% 
     ggplot(aes(x = variant, y = rho, ymin = ci_low, ymax = ci_high)) + 
