@@ -40,11 +40,12 @@ sample_varmat <- function(lineages, counts) {
     provoc:::varmat_from_list(samples)
 }
 
-variants <- read.csv("data/clean/var_params.csv")
+variants <- read.csv("data/clean/variant_params.csv")
 
 for(date in unique(variants$week)) {
+    print(date)
     day_vars <- variants[variants$week == ymd(date),]
-    for(rep in 1:10) {
+    for(rep in 1:100) {
         sampled_varmat <- sample_varmat(lineages = day_vars$lineage, 
             counts = round(day_vars$percent*N))
         coco <- simulate_coco(sampled_varmat, verbose = FALSE, 
@@ -57,16 +58,12 @@ for(date in unique(variants$week)) {
         coco <- cocovar$coco
         varmat <- cocovar$varmat
         all_res_tmp <- bind_rows(
-            alcov(coco, varmat, method = "lm"),
-            alcov(coco, varmat, method = "robust"),
-            alcov(coco, varmat, method = "nnls"),
-            freyja(coco, varmat),
-            avg_freq(fused, method = "simple"),
-            #avg_freq(fused, method = "binomial"),
-            #avg_freq(fused, method = "quasibinomial"),
-            provoc_optim2(coco, varmat)
+            alcov(coco, varmat),
+            optim_methods(coco, varmat),
+            avg_freq(fused, method = "Simple Avg")
         )
         all_res_tmp$iter <- i
+        all_res_tmp$date <- date
         if(i == 1) {
             all_res <- all_res_tmp
         } else {
@@ -76,6 +73,11 @@ for(date in unique(variants$week)) {
 }
 
 head(all_res)
+
+ggplot(all_res) +
+    aes(x = method, y = rho, fill = method) +
+    geom_violin() +
+    facet_grid(date ~ variant)
 
 
 
