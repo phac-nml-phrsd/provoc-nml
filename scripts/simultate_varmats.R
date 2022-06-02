@@ -64,6 +64,9 @@ for(date in unique(variants$week)) {
         )
         all_res_tmp$iter <- i
         all_res_tmp$date <- date
+        all_res_tmp <- left_join(all_res_tmp,
+            data.frame(variant = day_vars$lineage, prob = day_vars$percent),
+            by = "variant")
         if(i == 1) {
             all_res <- all_res_tmp
         } else {
@@ -74,15 +77,17 @@ for(date in unique(variants$week)) {
 
 head(all_res)
 
-ggplot(all_res) +
+retain <- all_res %>%
+    group_by(variant) %>%
+    summarise(keep = quantile(rho, prob = 0.95, na.rm = TRUE) > 0.1)
+
+all_res2 <- left_join(all_res, retain) %>%
+    filter(keep, !is.na(rho))
+
+ggplot(all_res2) +
     aes(x = method, y = rho, fill = method) +
     geom_violin() +
-    facet_grid(date ~ variant)
-
-
-
-
-
-
-
+    facet_grid(date ~ variant) + 
+    geom_hline(aes(yintercept = prob, group = variant)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 
