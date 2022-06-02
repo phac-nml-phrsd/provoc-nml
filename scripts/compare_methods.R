@@ -117,57 +117,104 @@ provoc_optim2 <- function(coco, varmat) {
 }
 
 
-varmat <- astronomize()
-varmat <- varmat[rownames(varmat) %in% c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2", "B.1.617.2+K417N"), ]
-varmat <- varmat[rownames(varmat) %in% c("B.1.617.2", "B.1.617.2+K417N"), ]
-varmat <- varmat[, apply(varmat, 2, sum) > 0]
-rownames(varmat) <- gsub("\\+", "_", rownames(varmat))
-true_vals <- data.frame(
-    variant = row.names(varmat),
-    #prob = c(0.3, 0.2, 0.1, 0.35, 0.05)
-    prob = c(0.97, 0.03)
-)
-rel_counts <- round(true_vals$prob * 500)
-
-for(i in 1:1000) {
-    coco <- simulate_coco(varmat, rel_counts = rel_counts, verbose = FALSE)
-    fused <- fuse(coco, varmat, verbose = FALSE)
-    fused <- fused[fused$coverage > 0,]
-    # Fuse to ensure same mutation list with correct order
-    cocovar <- provoc:::fission(fused)
-    coco <- cocovar$coco
-    varmat <- cocovar$varmat
-    all_res_tmp <- bind_rows(
-        alcov(coco, varmat, method = "AlCoV-LM"),
-        alcov(coco, varmat, method = "AlCoV-Robust"),
-        alcov(coco, varmat, method = "AlCoV-NNLS"),
-        freyja(coco, varmat),
-        avg_freq(fused, method = "Simple Avg"),
-        #avg_freq(fused, method = "binomial"),
-        #avg_freq(fused, method = "quasibinomial"),
-        provoc_optim2(coco, varmat)
+truth <- list(
+    Deltacron = data.frame(
+        variants = c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2", "B.1.617.2+K417N"),
+        probs = c(0.3, 0.2, 0.1, 0.35, 0.05)
+    ),
+    Delta_Plus_Plus = data.frame(
+        variants = c("B.1.617.2", "B.1.617.2+K417N"),
+        probs = c(0.97, 0.3)
+    ),
+    Too_Close_to_Call = data.frame(
+        variants = c("B.1.617.2", "B.1.617.2+K417N", "A.23.1", "A.23.1+E484K", 
+            "BA.1", "BA.2"),
+        probs = c(0.5, 0.03, 0.2, 0.02, 0.2, 0.05)
+    ),
+    Total_Below_One = data.frame(
+        variants = c("BA.1", "BA.2", "B.1.617.2"),
+        probs = c(0.2, 0.6, 0.2)
+    ),
+    One_Two_Punch = data.frame(
+        variants = c("BA.1", "BA.2"),
+        probs = c(0.2, 0.8)
+    ),
+    EZPZ = data.frame(
+        variants = c("B.1.1.529", "B.1.617.2"),
+        probs = c(0.5, 0.5)
     )
-    all_res_tmp$iter <- i
-    if(i == 1) {
-        all_res <- all_res_tmp
+)
+
+for (scenario in names(truth)) {
+    varmat <- astronomize()
+    varmat <- varmat[rownames(varmat) %in% truth[[scenario]]$variants,, drop = FALSE]
+    varmat <- varmat[, apply(varmat, 2, sum) > 0]
+    rownames(varmat) <- gsub("\\+", "_", rownames(varmat))
+    varmat <- varmat[order(rownames(varmat)), ]
+    true_vals <- data.frame(
+        variant = row.names(varmat),
+        prob = truth[[scenario]]$probs)
+    rel_counts <- round(true_vals$prob * 500)
+
+    for(i in 1:10) {
+        if(scenario == "Total_Below_One") {
+            varmat2 <- varmat[1:2,, drop = FALSE]
+            rel_counts2 <- rel_counts[1:2]
+        } else {
+            varmat2 <- varmat
+            rel_counts2 <- rel_counts
+        }
+        coco <- simulate_coco(varmat2, rel_counts = rel_counts2, verbose = FALSE)
+        fused <- fuse(coco, varmat2, verbose = FALSE)
+        # Fuse to ensure same mutation list with correct order
+        cocovar <- provoc:::fission(fused)
+        coco <- cocovar$coco
+        varmat2 <- cocovar$varmat
+        all_res_tmp <- bind_rows(
+            alcov(coco, varmat2, method = "AlCoV-LM"),
+            tryCatch(alcov(coco, varmat2, method = "AlCoV-Robust"), 
+                error = function(e) data.frame(rho = NA)),
+            alcov(coco, varmat2, method = "AlCoV-NNLS"),
+            freyja(coco, varmat2),
+            avg_freq(fused, method = "Simple Avg"),
+            #avg_freq(fused, method = "binomial"),
+            #avg_freq(fused, method = "quasibinomial"),
+            provoc_optim2(coco, varmat2)
+        )
+        all_res_tmp$iter <- i
+        if(i == 1) {
+            all_res <- all_res_tmp
+        } else {
+            all_res <- bind_rows(all_res, all_res_tmp)
+        }
+    }
+
+    true_vals2 <- bind_rows(true_vals, 
+        data.frame(variant = "total", 
+            prob = sum(rel_counts2) / sum(rel_counts)))
+    all_res1 <- all_res %>%
+        group_by(method, iter) %>%
+        summarise(variant = "total",
+            rho = sum(rho, na.rm = TRUE), 
+            .groups = "drop") %>%
+        bind_rows(all_res)
+    all_res2 <- left_join(all_res1, true_vals2, by = "variant")
+    all_res2$scenario <- scenario
+    if(scenario == names(truth)[1]) {
+        all_res3 <- all_res2
     } else {
-        all_res <- bind_rows(all_res, all_res_tmp)
+        all_res3 <- bind_rows(all_res3, all_res2)
     }
 }
 
-all_res <- left_join(all_res, true_vals, by = "variant")
-
-ggplot(all_res, aes(x = method, y = rho, fill = method)) +
+ggplot(all_res3, aes(x = method, y = rho, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
-    facet_wrap(~ variant, scales = "free_y") +
+    facet_grid(scenario ~ variant, scales = "free") +
     geom_hline(aes(yintercept = prob, group = variant)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) #+
-    #geom_hline(yintercept = 0, linetype = "dashed")
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 
-ggplot(filter(all_res, !is.na(method))) +
-    aes(x = method, y = rho - prob, fill = variant) +
-    geom_hline(yintercept = 0, linetype = "dashed") +
+ggplot(all_res3, aes(x = method, y = rho - prob, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
-    labs(x = NULL, y = "Error",
-        title = "Simulation Results",
-        subtitle = "Simulated samples from Constellations\nProVoC has lowest variance")
+    facet_grid(scenario ~ variant, scales = "free") +
+    geom_hline(yintercept = 0) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
