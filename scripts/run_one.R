@@ -41,7 +41,7 @@ abline(0, 1) # There's a problem here - ignoring for now.
 
 
 if(varmat_type == "constellations") {
-    varmat <- astronomize(path = here("..", "/constellations"))
+    varmat <- astronomize(path = "../constellations/constellations/definitions")
 } else if (varmat_type == "varmat_from_variants-all_voc") {
     all_voc <-  c("B.1.1.529", "BA.1", "BA.1.1", "BA.2", 
         "B.1.1.7", "P.1", "P.2", "P.3", 
@@ -84,5 +84,6 @@ pred_compare <- inner_join(
     by = "mutation")
 
 ggplot(pred_compare) +
-    aes(x = frequency, y = rho) + 
-    geom_point()
+    aes(x = frequency*coverage, y = rho*coverage) + 
+    geom_point() +
+    geom_abline(aes(intercept = 0, slope = 1))
