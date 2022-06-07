@@ -3,6 +3,7 @@ alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NN
     freqs <- coco$count/coco$coverage
     df <- as.data.frame(t(varmat))
     df$freq <- freqs
+    df <- df[!is.na(df$freq),]
 
     bind_rows(lapply(method, function(methi) {
         t0 <- Sys.time()
@@ -12,8 +13,8 @@ alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NN
             res <- tryCatch(summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2],
                 error = function(e) data.frame(NA, NA))
         } else if(methi == "AlCoV-NNLS"){
-            freqs[freqs == 0] <- 0.0001
-            res <- cbind(nnls(t(varmat), freqs)$x, NA)
+            df$freq[df$freq == 0] <- 0.0001
+            res <- cbind(nnls(t(varmat), df$freq)$x, NA)
             rownames(res) <- rownames(varmat)
         } else if(methi == "AlCoV-Binom"){
             res <- summary(glm(freq ~ ., data = df))$coef[-1, 1:2]
@@ -104,14 +105,14 @@ avg_freq <- function(fused, method = c("Simple Avg", "Simple Med", "Binomial_GLM
                     avg <- c(avg, mean(avg_tmp))
                     se <- c(se, sd(avg_tmp))
                 } else {
-                    avg <- c(avg, median(avg_tmp))
-                    se <- c(se, IQR(avg_tmp))
+                    avg <- c(avg, median(avg_tmp, na.rm = TRUE))
+                    se <- c(se, IQR(avg_tmp, na.rm = TRUE))
                 }
             }
         } else {
             successes <- sub_fuse$count
             failures <- sub_fuse$coverage - successes
-            if(length(successes) > 2) {
+            if(length(successes) > 3) {
                 res <- glm(cbind(successes, failures) ~ 1,
                     family = ifelse(method[1] == "Binomial_GLM", binomial, quasibinomial))
                 avg <- c(avg, exp(res$coef)/(1 + exp(res$coef)))
