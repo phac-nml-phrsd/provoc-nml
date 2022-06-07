@@ -4,6 +4,8 @@ library(dplyr)
 library(provoc)
 library(nnls)
 
+source("alt_methods.R")
+
 params <- read.csv("data/clean/variant_params.csv")
 N <- 50
 total_seqs <- 1000
