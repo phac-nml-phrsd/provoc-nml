@@ -19,8 +19,11 @@ alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NN
         } else if(methi == "AlCoV-Binom"){
             res <- summary(glm(freq ~ ., data = df))$coef[-1, 1:2]
         }
-        res <- data.frame(variant = rownames(res), rho = res[,1], se = res[,2], 
-            method = methi, time = as.numeric(difftime(Sys.time(), t0, units = "secs"))/nrow(res))
+        res <- data.frame(variant = as.character(rownames(res)), 
+            rho = as.numeric(res[,1]), 
+            se = as.numeric(res[,2]), 
+            method = as.character(methi), 
+            time = round(as.numeric(difftime(Sys.time(), t0, units = "secs"))/nrow(res), 4))
         row.names(res) <- NULL
         res
     }))
@@ -79,8 +82,11 @@ optim_methods <- function(coco, varmat,
             count = coco$count, coverage = coco$coverage, varmat = varmat,
             methi = meth,
             control = list(maxit = 10000))
-        data.frame(variant = rownames(varmat), rho = res$par, method = meth,
-            time = as.numeric(difftime(Sys.time(), t0, units = "secs"))/length(res$par))
+        data.frame(variant = as.character(rownames(varmat)),
+            rho = as.numeric(res$par), 
+            se = NA, 
+            method = as.character(meth),
+            time = round(as.numeric(difftime(Sys.time(), t0, units = "secs"))/length(res$par), 5))
     }))
 }
 
