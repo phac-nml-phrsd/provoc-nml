@@ -4,34 +4,27 @@ library(provoc)
 library(dplyr)
 library(ggplot2)
 theme_set(theme_bw())
+library(here)
 
-source("alt_methods.R")
+source(here("scripts", "alt_methods.R"))
 
 truth <- list(
     Deltacron = data.frame(
-        variants = c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2", "B.1.617.2+K417N"),
-        probs = c(0.3, 0.2, 0.1, 0.35, 0.05)
-    ),
-    Delta_Plus_Plus = data.frame(
-        variants = c("B.1.617.2", "B.1.617.2+K417N"),
-        probs = c(0.97, 0.3)
+        variants = c("BA.1", "BA.2", "B.1.1.529", "B.1.617.2"),
+        probs = c(0.3, 0.2, 0.1, 0.35)
     ),
     Too_Close = data.frame(
-        variants = c("B.1.617.2", "B.1.617.2+K417N", "A.23.1", "A.23.1+E484K", 
+        variants = c("B.1.617.2", "B.1.617.2+K417N", 
             "AY.4.2", "AY.4"),
-        probs = c(0.5, 0.03, 0.2, 0.02, 0.2, 0.05)
+        probs = c(0.5, 0.05, 0.2, 0.2)
     ),
     Total_Below_One = data.frame(
         variants = c("BA.1", "BA.2", "B.1.1.529"),
         probs = c(0.2, 0.6, 0.2)
     ),
-    One_Two_Punch = data.frame(
-        variants = c("BA.1", "BA.2"),
-        probs = c(0.2, 0.8)
-    ),
-    EZPZ = data.frame(
-        variants = c("B.1.1.529", "B.1.617.2"),
-        probs = c(0.5, 0.5)
+    Omicron = data.frame(
+        variants = c("B.1.1.529", "BA.1", "BA.2"),
+        probs = c(0.2, 0.6, 0.2)
     )
 )
 
@@ -44,7 +37,7 @@ for (scenario in names(truth)) {
     varmat <- varmat[order(rownames(varmat)), ]
     true_vals <- data.frame(
         variant = row.names(varmat),
-        prob = truth[[scenario]]$probs)
+        prob = truth[[scenario]]$probs/sum(truth[[scenario]]$probs))
     rel_counts <- round(true_vals$prob * 1000)
     if(scenario == "Total_Below_One") {
         varmat2 <- varmat[2:3,, drop = FALSE]
@@ -96,7 +89,10 @@ for (scenario in names(truth)) {
     }
 }
 
-ggplot(all_res3, aes(x = method, y = rho, fill = method)) +
+all_res4 <- filter(all_res3, 
+    method %in% c("AlCoV-LM", "freyja", "provoc", "Simple Avg"))
+
+ggplot(all_res4, aes(x = method, y = rho, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
     facet_grid(scenario ~ variant, scales = "free") +
     geom_hline(aes(yintercept = prob, group = variant)) +
