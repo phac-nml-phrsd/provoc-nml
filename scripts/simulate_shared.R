@@ -13,19 +13,20 @@ for (i in 0:19) {
     X1 <- c(rep(1, 20), rep(0, 20 - i), rep(0, 5))
     X2 <- c(rep(0, 20 - i), rep(1, 20), rep(0, 5))
 
-    for(ii in 1:1000) {
+    for(ii in 1:2000) {
         X3 <- rbinom(length(X1), prob = 0.5, size = 1)
         varmat <- do.call(rbind, list(X1, X2, X3))
         rownames(varmat) <- paste0("Variant", 1:nrow(varmat))
         colnames(varmat) <- paste0("M", 1:ncol(varmat))
         coco <- simulate_coco(varmat, rel_counts = c(420, 120, 60), verbose = FALSE)
         fused <- fuse(coco, varmat, verbose = FALSE)
-        res <- bind_rows(
-            alcov(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-Binom")),
-            optim_methods(coco, varmat),
+        res <- tryCatch(bind_rows(
+            alcov(coco, varmat, method = c("AlCoV-LM")),
+            optim_methods(coco, varmat, method = c("freyja", "provoc")),
             avg_freq(fused, method = "Simple Avg"),
             avg_freq(fused, method = "Simple Med")
-            )
+            ), error = function(e) print(e))
+        if("error" %in% class(res)) next
         res$overlap <- i
         if(ii == 1) {
             res_tmp <- res
@@ -41,7 +42,7 @@ for (i in 0:19) {
     }
 }
 
-head(all_res)
+saveRDS(all_res, here("output", "all_res_shared.RDS"))
 
 ggplot(all_res) +
     aes(x = factor(overlap, ordered = TRUE),
