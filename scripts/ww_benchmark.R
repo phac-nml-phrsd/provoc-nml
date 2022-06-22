@@ -61,9 +61,11 @@ if(FALSE) {
     dim(varmat)
 }
 
-varmat <- varmat_from_variants(consensuses, max_n = 300, top_quantile = 0)
-dim(varmat)
-rowSums(varmat)
+m_rep <- readRDS(here("output", "mutations.RDS"))
+varmat <- varmat_from_variants(consensuses, max_n = 300, top_quantile = 0, mutations = m_rep)
+varmat <- varmat[, colSums(varmat) > 1]
+varmat <- varmat[rowSums(varmat) > 0, ]
+
 varmut <- colnames(varmat)
 varpos <- integer(length(varmut))
 for (i in seq_along(varmut)) {
@@ -81,7 +83,6 @@ for (i in seq_along(varmut)) {
     }
 }
 colnames(varmat) <- varmut
-dim(varmat)
 
 coco <- full_join(
     mfiles[mfiles$position %in% varpos,], 
@@ -101,10 +102,12 @@ dim(fused)
 
 res <- provoc(fused = fused, method = "optim")
 
-ggplot(res) +
-    aes(x = variant, y = rho) +
-    geom_point() +
-    facet_wrap(~sample)
+res %>% filter(rho > 0.05) %>%
+    ggplot() +
+        aes(x = variant, y = rho) +
+        geom_point() +
+        facet_wrap(~sample, scales = "free_y") +
+        coord_flip()
 
 res %>% 
     group_by(sample) %>%
