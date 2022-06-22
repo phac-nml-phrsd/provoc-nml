@@ -16,3 +16,4 @@ results/*.pdf
 report/*
 !report/*tex
 !report/*bib
+output/*
