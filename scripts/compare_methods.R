@@ -47,7 +47,7 @@ for (scenario in names(truth)) {
         rel_counts2 <- rel_counts
     }
 
-    for(i in 1:100) {
+    for(i in 1:50) {
         coco <- simulate_coco(varmat, rel_counts = rel_counts, verbose = FALSE)
         fused <- fuse(coco, varmat2, verbose = FALSE)
         fused <- filter(fused, coverage > 0)
@@ -61,7 +61,9 @@ for (scenario in names(truth)) {
             avg_freq(fused, method = "Simple Avg"),
             avg_freq(fused, method = "Simple Med"),
             avg_freq(fused, method = "Binomial_GLM"),
-            avg_freq(fused, method = "Binomial_GLM_Quasi")
+            avg_freq(fused, method = "Binomial_GLM_Quasi"),
+            vdt_formatted(fused),
+            vba(fused, 100, 20)
         )
         all_res_tmp$iter <- i
         if(i == 1) {
@@ -90,7 +92,7 @@ for (scenario in names(truth)) {
 }
 
 all_res4 <- filter(all_res3, 
-    method %in% c("AlCoV-LM", "freyja", "provoc", "Simple Avg"))
+    method %in% c("AlCoV-LM", "freyja", "provoc", "Simple Avg", "vdt", "vba"))
 
 ggplot(all_res4, aes(x = method, y = rho, fill = method)) +
     geom_violin(draw_quantiles = c(0.045, 0.5, 0.954)) +
