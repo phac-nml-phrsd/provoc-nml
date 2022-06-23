@@ -7,6 +7,7 @@ theme_set(theme_bw())
 library(here)
 
 source(here("scripts", "alt_methods.R"))
+source(here("scripts", "variant_bagging.R"))
 
 truth <- list(
     Deltacron = data.frame(
@@ -62,8 +63,8 @@ for (scenario in names(truth)) {
             avg_freq(fused, method = "Simple Med"),
             avg_freq(fused, method = "Binomial_GLM"),
             avg_freq(fused, method = "Binomial_GLM_Quasi"),
-            vdt_formatted(fused),
-            vba(fused, 100, 20)
+            vdt(fused),
+            vba(fused, 50, 50)
         )
         all_res_tmp$iter <- i
         if(i == 1) {
