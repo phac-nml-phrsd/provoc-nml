@@ -5,6 +5,7 @@ library(dplyr) # I tried not to use it
 
 
 vdt <- function(fused) {
+    t0 <- Sys.time()
     varnames <- names(fused)[startsWith(names(fused), "var_")]
     if(!"frequency" %in% names(fused)) {
         fused$frequency <- fused$count / fused$coverage
@@ -25,39 +26,40 @@ vdt <- function(fused) {
 
         # Update step
         new_index <- fused2[, varnames[winner]] == 1
-        fused1 <- fused2[new_index, ]
-        fused1$frequency <- fused1$frequency - rho[winner]
-        fused1$frequency[fused1$frequency < 0] <- 0
-        expected_count <- rho[winner] * fused1$coverage
-        fused1$count <- fused1$count - expected_count
-        fused1$count[fused1$count < 0] <- 0
-        fused1$coverage <- fused1$coverage - expected_count
-        fused1$coverage[fused1$coverage < 0] <- 0
+        expected_count <- new_index * rho[winner] * fused2$coverage
+        fused2$frequency <- fused2$frequency - new_index * rho[winner]
+        fused2$count <- fused2$count - expected_count
+        fused2$coverage <- fused2$coverage - expected_count
 
-        fused2 <- rbind(fused2[!new_index,], fused1)
+        fused2$frequency[fused2$frequency < 0] <- 0
+        fused2$count[fused2$count < 0] <- 0
+        fused2$coverage[fused2$coverage < 0] <- 0
+
         fused2[, varnames[winner]] <- rep(0, nrow(fused2))
     }
-    rho
+    res_df <- data.frame(rho = rho,
+        se = NA,
+        variant = gsub("var_", "", names(rho), fixed = TRUE),
+        method = "vdt",
+        time = as.numeric(difftime(Sys.time(), t0, units = "secs"))
+    )
+    rownames(res_df) <- NULL
+    res_df
 }
 
-vdt(fused)
-
-bootstrap_counts <- function(df) {
-    case1 <- unlist(sapply(1:nrow(df), function(x) rep(x, df$count[x])))
-    df1 <- df[case1,]
-    df1$case <- 1
-
-    case0 <- unlist(sapply(1:nrow(df), 
-        function(x) rep(x, df$coverage[x] - df$count[x])))
-    df0 <- df[case0, ]
-    df0$case <- 0
-
-    new_df <- rbind(df1, df0)
-
-    new_df <- new_df[sample(1:nrow(new_df), nrow(new_df), TRUE),]
-    new_df %>% select(-count, -coverage) %>%
-        group_by(across(c(-case))) %>%
-        summarise(count = sum(case), coverage = n(), .groups = "drop")
+bootstrap_poisson <- function(df) {
+    if("frequency" %in% names(df)) {
+        df$coverage <- rpois(nrow(df), df$coverage)
+        df$count <- rbinom(nrow(df), prob = df$frequency, size = df$count)
+        df$frequency <- df$count/df$coverage
+        df$frequency[df$coverage == 0] <- 0
+        return(df)
+    } else {
+        df$coverage <- rpois(nrow(df), df$coverage)
+        df$count <- rbinom(nrow(df), prob = df$count/df$coverage, size = df$count)
+        df$count[df$coverage == 0] <- 0
+        return(df)
+    }
 }
 
 vba <- function(fused, var_replicates = 20, boot_replicates = 2) {
@@ -65,30 +67,25 @@ vba <- function(fused, var_replicates = 20, boot_replicates = 2) {
     varnames <- names(fused)[startsWith(names(fused), "var_")]
     
     if(length(varnames) <= 2) {
-        return(data.frame(rho = NA, se = NA, time = NA, variant = varnames, method = "vba"))
+        return(data.frame(rho = NA, se = NA, time = NA, 
+            variant = gsub("var_", "", varnames, fixed = TRUE), 
+            method = "vba"))
     }
-    reps <- replicate(var_replicates, {
+    reps <- do.call(rbind, replicate(var_replicates, {
         var_rm <- sample(varnames, round(0.3*length(varnames), 0), FALSE)
         fused_vars <- fused[, names(fused)[!names(fused) %in% var_rm]]
-        res <- replicate(boot_replicates, {
-            vdt(bootstrap_counts(fused_vars))
-        })
-        res_na <- matrix(NA, ncol = ncol(res), nrow = length(var_rm))
-        rownames(res_na) <- var_rm
-        res <- rbind(res, res_na)
-        res[order(rownames(res)),]
-    })
-    rho <- apply(reps, 1, mean, na.rm = TRUE)
-    data.frame(rho = rho,
-        se = apply(reps, 1, sd, na.rm = TRUE),
-        variant = gsub("var_", "", names(rho), fixed = TRUE),
-        method = "vba",
-        time = as.numeric(difftime(Sys.time(), t0, units = "secs"))
-    )
+        res <- do.call(rbind, replicate(boot_replicates,
+            vdt(bootstrap_poisson(fused_vars)), simplify = FALSE))
+    }, simplify = FALSE))
+    res_df <- do.call(rbind, lapply(split(reps, reps$variant), function(x) {
+        data.frame(rho = mean(x$rho), se = sd(x$rho), variant = x$variant[1],
+            method = "vba", time = sum(x$time))
+    }))
 }
 
 if(FALSE) { # Testing
     library(ggplot2)
+    library(microbenchmark)
     varmat <- astronomize()
     true_vars <- c("B.1.1.529", "BA.1", "BA.2", "B.1.617.2", "AY.4")
     true_counts <- c(500, 400, 100, 500, 100)
