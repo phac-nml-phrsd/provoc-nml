@@ -26,6 +26,7 @@ vdt <- function(fused) {
         winner <- which.max(infos)
         if(length(winner) > 1) winner <- winner(sample(winner, 1))
         winner_val <- mean(fused2$frequency[fused2[, varnames[winner]] == 1])
+        if(winner_val < 0.01) break
         if((sum(rho) + winner_val) > 1) winner_val <- 1 - sum(rho)
         rho[winner] <- winner_val
 
