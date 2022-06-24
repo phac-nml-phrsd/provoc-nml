@@ -1,3 +1,5 @@
+t0 <- Sys.time()
+
 library(provoc)
 library(dplyr)
 library(ggplot2)
@@ -61,8 +63,12 @@ if(FALSE) {
     dim(varmat)
 }
 
+t_intake <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Data intake took ", t_intake))
+t1 <- Sys.time()
+
 m_rep <- readRDS(here("output", "mutations.RDS"))
-varmat <- varmat_from_variants(consensuses, max_n = 300, top_quantile = 0, mutations = m_rep)
+varmat <- varmat_from_variants(consensuses, max_n = 400, top_quantile = 0, mutations = m_rep)
 varmat <- varmat[, colSums(varmat) > 1]
 varmat <- varmat[rowSums(varmat) > 0, ]
 
@@ -100,20 +106,29 @@ coco$label <- NULL
 fused <- fuse(coco, varmat)
 dim(fused)
 
-res <- provoc(fused = fused, method = "optim")
 
-res %>% filter(rho > 0.05) %>%
+t_fusion1 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Varmat creation and fusion took ", t_fusion1))
+t1 <- Sys.time()
+
+res1 <- provoc(fused = fused, method = "optim")
+
+t_res1 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Fitting took ", t_res1))
+t1 <- Sys.time()
+
+res1 %>% filter(rho > 0.05) %>%
     ggplot() +
         aes(x = variant, y = rho) +
         geom_point() +
         facet_wrap(~sample, scales = "free_y") +
         coord_flip()
 
-res %>% 
+res1 %>% 
     group_by(sample) %>%
     summarise(s = sum(rho)) %>% pull(s)
 
-
+res1$mutation_list <- "Processed from NextStrain"
 
 
 
@@ -132,7 +147,17 @@ f2 <- fused %>%
     filter(keep) %>%
     select(-keep)
 
+
+t_fusion2 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Varmat creation and fusion took ", t_fusion2))
+t1 <- Sys.time()
+
 res2 <- provoc(fused = f2, method = "optim")
+res2$mutation_list <- "Constellations repo"
+
+t_res2 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Fitting took ", t_res2))
+t1 <- Sys.time()
 
 ggplot(res2) +
     aes(x = variant, y = rho) +
@@ -142,3 +167,18 @@ ggplot(res2) +
 res2 %>% 
     group_by(sample) %>%
     summarise(s = sum(rho)) %>% pull(s)
+
+ww_bench <- rbind(res1, res2)
+ww_bench[, c("ci_low", "ci_high")] <- NULL
+names(ww_bench)[1] <- "proportion"
+
+write.csv(ww_bench, here("output", "ww_results.csv"))
+
+print(paste0("Data intake took ", t_intake))
+print(paste0("Variant 1 took ", t_fusion1))
+print(paste0("Fitting 1 took ", t_res1))
+print(paste0("Variant 2 took ", t_fusion2))
+print(paste0("Fitting 2 took ", t_res2))
+print(paste0("Total Rscript: ", difftime(Sys.time(), t0, units = "secs")))
+
+
