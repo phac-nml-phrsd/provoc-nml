@@ -11,6 +11,7 @@ mapped <- list.files(here("output/gromstole"),
 coverage <- list.files(here("output/gromstole"), 
     pattern = "coverage", full.names = TRUE)
 
+length(mapped)
 length(mapped) == length(coverage)
 
 mfiles <- lapply(mapped, read.csv)
@@ -181,4 +182,100 @@ print(paste0("Variant 2 took ", t_fusion2))
 print(paste0("Fitting 2 took ", t_res2))
 print(paste0("Total Rscript: ", difftime(Sys.time(), t0, units = "secs")))
 
+varmat <- astronomize()
+varmat <- varmat[rownames(varmat) %in% c("B.1.617.2", 
+    "BA.1", "BA.2"),]
+coco <- full_join(mfiles, cfiles, by = c("position", "sample"))
+coco$coverage <- apply(coco[, c("coverage.x", "coverage.y")], 1, 
+    mean, na.rm = TRUE)
+coco$coverage.x <- coco$coverage.y <- NULL
+coco$count <- coco$frequency * coco$coverage
+fused <- fuse(coco, varmat)
 
+f2 <- fused %>%
+    group_by(sample) %>%
+    mutate(keep = n() > 15) %>%
+    ungroup() %>%
+    filter(keep) %>%
+    select(-keep)
+
+
+t_fusion2 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Varmat creation and fusion took ", t_fusion2))
+t1 <- Sys.time()
+
+res3 <- provoc(fused = f2, method = "optim")
+res3$mutation_list <- "Delta and Omicron Constellations"
+
+t_res3 <- difftime(Sys.time(), t1, units = "secs")
+print(paste0("Fitting took ", t_res3))
+
+res3[, c("ci_low", "ci_high")] <- NULL
+head(res3, 18)
+
+ggplot(res3, aes(x = variant, y = rho, colour = variant)) + 
+    geom_point() + 
+    facet_wrap(~sample) + 
+    coord_flip()
+
+write.csv(res3, here("output", "ww-delta_and_omicron.csv"))
+
+
+varmat <- astronomize(path = here("data", "gromstollations"))
+# Manual fix
+colnames(varmat)[which(colnames(varmat) == "+2205.GAGCCAGAA")] <- "ins:22205:9"
+coco <- full_join(mfiles, cfiles, by = c("position", "sample"))
+coco$coverage <- apply(coco[, c("coverage.x", "coverage.y")], 1, 
+    mean, na.rm = TRUE)
+coco$coverage.x <- coco$coverage.y <- NULL
+coco$count <- coco$frequency * coco$coverage
+
+
+mut_bad <- which(is.na(match(colnames(varmat), coco$mutation)))
+for(i in mut_bad){
+    col_bad <- colnames(varmat)[i]
+    col_good <- parse_mutation("~", 
+        substr(col_bad, 1, nchar(col_bad) - 1),
+        substr(col_bad, nchar(col_bad), nchar(col_bad)))
+    colnames(varmat)[i] <- col_good
+
+}
+
+fused <- fuse(coco, varmat)
+
+f2 <- fused %>%
+    group_by(sample) %>%
+    mutate(keep = n() > 15) %>%
+    ungroup() %>%
+    filter(keep) %>%
+    select(-keep)
+
+
+t_fusion2 <- difftime(Sys.time(), t0, units = "secs")
+print(paste0("Varmat creation and fusion took ", t_fusion2))
+t1 <- Sys.time()
+
+res4 <- provoc(fused = f2, method = "optim")
+res4$mutation_list <- "Delta and Omicron Gromstollations"
+
+t_res4 <- difftime(Sys.time(), t1, units = "secs")
+print(paste0("Fitting took ", t_res4))
+
+res4[, c("ci_low", "ci_high")] <- NULL
+head(res4, 18)
+
+ggplot(res4, aes(x = variant, y = rho, colour = variant)) + 
+    geom_point() + 
+    facet_wrap(~sample) + 
+    coord_flip()
+
+full_join(res3, res4, by = c("variant", "sample")) %>%
+    ggplot() + 
+        aes(x = variant, colour = variant) +
+        geom_point(aes(y = rho.x), shape = 16) +
+        geom_point(aes(y = rho.y), shape = 17) +
+        geom_segment(aes(xend = variant, y = rho.x, yend = rho.y)) +
+        facet_wrap(~sample) +
+        coord_flip()
+
+write.csv(res4, file = here("output", "ww_results_gromstollations.csv"))
