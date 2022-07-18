@@ -8,16 +8,16 @@ alcov <- function(coco, varmat, method = c("AlCoV-LM", "AlCoV-Robust", "AlCoV-NN
     bind_rows(lapply(method, function(methi) {
         t0 <- Sys.time()
         if(methi == "AlCoV-LM") {
-            res <- summary(lm(freq ~ 0 + ., data = df))$coef[, 1:2]
+            res <- summary(lm(freq ~ 0 + ., data = df))$coef[, 1:2, drop = FALSE]
         } else if(methi == "AlCoV-Robust"){
-            res <- tryCatch(summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2],
+            res <- tryCatch(summary(MASS::rlm(freq ~ 0 + ., data = df))$coef[, 1:2, drop = FALSE],
                 error = function(e) data.frame(NA, NA))
         } else if(methi == "AlCoV-NNLS"){
             df$freq[df$freq == 0] <- 0.0001
             res <- cbind(nnls(t(varmat), df$freq)$x, NA)
             rownames(res) <- rownames(varmat)
         } else if(methi == "AlCoV-Binom"){
-            res <- summary(glm(freq ~ ., data = df))$coef[-1, 1:2]
+            res <- summary(glm(freq ~ ., data = df))$coef[-1, 1:2, drop = FALSE]
         }
         res <- data.frame(variant = as.character(rownames(res)), 
             rho = as.numeric(res[,1]), 
