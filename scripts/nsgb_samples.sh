@@ -14,3 +14,5 @@ do
     zcat metadata_2022-06-20.tsv.gz | awk -F "\t" -v var="${variant}" '{ if (NR == 1 || $20 == var)  print $6 "; " $7 "; " $8 "; " $15 "; " $20 "; " $28"; "$42"; "$43"; "$44"; "$45"; "$46"; "$47"; "$48 "; "$49}' > "../../provoc-nml/output/${variant}_samples.txt" 
 done
 
+cd ../../provoc_nml
+Rscript nsgb_samples.R
